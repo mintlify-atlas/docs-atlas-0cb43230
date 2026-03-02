@@ -1,0 +1,104 @@
+{
+  "projectType": "api-service",
+  "projectName": "Antigravity Claude Proxy",
+  "projectDescription": "Proxy server that exposes an Anthropic-compatible API backed by Antigravity Cloud Code, enabling Claude and Gemini models with intelligent multi-account load balancing.",
+  "theme": "aspen",
+  "primaryColor": "#8B5CF6",
+  "lightColor": "#A78BFA",
+  "darkColor": "#6D28D9",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/account-management",
+              "guides/claude-code-setup",
+              "guides/load-balancing",
+              "guides/web-console"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/models",
+              "configuration/advanced-config",
+              "configuration/fallback-strategy"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/openclaw"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Endpoints",
+            "pages": [
+              "api-reference/overview",
+              "api-reference/messages",
+              "api-reference/models",
+              "api-reference/health"
+            ]
+          },
+          {
+            "group": "Authentication",
+            "pages": [
+              "api-reference/authentication"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Resources",
+        "groups": [
+          {
+            "group": "Help & Legal",
+            "pages": [
+              "resources/troubleshooting",
+              "resources/testing",
+              "resources/safety-notices",
+              "resources/legal",
+              "resources/development"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Anthropic-compatible API proxy to Antigravity Cloud Code",
+    "Multi-account load balancing with sticky, round-robin, and hybrid strategies",
+    "Support for Claude (Opus, Sonnet, Haiku) and Gemini models",
+    "Intelligent quota management and automatic account switching",
+    "Web management dashboard with real-time monitoring",
+    "Prompt caching support for improved performance",
+    "Model fallback on quota exhaustion",
+    "CLI tool for account management and server control"
+  ],
+  "publicApiSurface": [
+    "POST /v1/messages - Send messages to Claude/Gemini models",
+    "GET /v1/models - List available models",
+    "GET /health - Server health check",
+    "GET /account-limits - Account quota and subscription info",
+    "acc start - Start proxy server",
+    "acc stop - Stop proxy server",
+    "acc accounts add - Add Google account via OAuth",
+    "acc ui - Open web dashboard"
+  ]
+}
