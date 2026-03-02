@@ -1,0 +1,484 @@
+---
+title: Load Balancing
+description: Distribute requests across multiple Google accounts with intelligent selection strategies
+icon: scale-balanced
+---
+
+When you configure multiple Google accounts, the proxy automatically distributes requests across them using configurable selection strategies. This maximizes throughput, avoids rate limits, and provides failover.
+
+## Selection Strategies
+
+Choose a strategy based on your usage pattern:
+
+<CardGroup cols={3}>
+  <Card title="Hybrid (Default)" icon="brain">
+    Smart multi-signal selection using health scores, token buckets, quota awareness, and LRU freshness
+  </Card>
+  <Card title="Sticky" icon="link">
+    Cache-optimized: stays on the same account to maximize prompt cache hits
+  </Card>
+  <Card title="Round-Robin" icon="arrow-rotate-right">
+    Maximum throughput: rotates accounts on every request for balanced load
+  </Card>
+</CardGroup>
+
+### Strategy Comparison
+
+| Strategy | Best For | Behavior | Prompt Caching |
+|----------|----------|----------|----------------|
+| **Hybrid** | Most users | Intelligent selection based on account health, available tokens, quota levels, and rest time | Moderate |
+| **Sticky** | Prompt caching | Stays on same account until rate-limited or unavailable (waits up to 2 minutes) | Excellent |
+| **Round-Robin** | High throughput | Rotates to next account on every request, skips unavailable accounts | Poor |
+
+## Configuring Strategy
+
+<Tabs>
+  <Tab title="CLI Flag">
+    Set strategy when starting the server:
+    ```bash
+    # Hybrid (default)
+    acc start --strategy=hybrid
+    
+    # Sticky (cache-optimized)
+    acc start --strategy=sticky
+    
+    # Round-Robin (load-balanced)
+    acc start --strategy=round-robin
+    ```
+  </Tab>
+  
+  <Tab title="Web Console">
+    Change strategy at runtime:
+    
+    1. Open web console: `http://localhost:8080`
+    2. Go to **Settings** → **Server**
+    3. Select **Account Selection Strategy**
+    4. Click **Save**
+    5. Restart proxy for changes to take effect
+  </Tab>
+  
+  <Tab title="Environment Variable">
+    Set via environment variable:
+    ```bash
+    STRATEGY=sticky acc start
+    ```
+  </Tab>
+</Tabs>
+
+## Strategy Details
+
+### Hybrid Strategy
+
+The default strategy uses multiple signals to select the best account:
+
+**Scoring Formula:**
+```
+score = (Health × 2) + ((Tokens / MaxTokens × 100) × 5) + (Quota × 3) + (LRU × 0.1)
+```
+
+<AccordionGroup>
+  <Accordion title="Health Score (Weight: 2)">
+    Tracks success/failure patterns for each account:
+    
+    - **Success**: +5 points (max 100)
+    - **Rate Limit**: -15 points
+    - **Failure**: -10 points
+    - **Passive Recovery**: +1 point per 5 minutes of inactivity
+    - **Minimum Usable**: 30 points
+    
+    Accounts below minimum threshold are excluded unless all accounts are unhealthy (emergency fallback).
+  </Accordion>
+  
+  <Accordion title="Token Bucket (Weight: 5)">
+    Client-side rate limiting to prevent overwhelming the API:
+    
+    - **Max Tokens**: 50 per account
+    - **Regeneration**: 6 tokens per minute
+    - **Cost**: 1 token per request
+    - **Refund**: Token returned if request fails
+    
+    Accounts with more available tokens are preferred.
+  </Accordion>
+  
+  <Accordion title="Quota Awareness (Weight: 3)">
+    Avoids accounts with critically low quota:
+    
+    - Checks model-specific quota remaining fraction
+    - Accounts below threshold are excluded
+    - Threshold priority: per-model > per-account > global
+    - Default threshold: 0% (disabled)
+    
+    See [Quota Protection](#quota-protection) for configuration.
+  </Accordion>
+  
+  <Accordion title="LRU Freshness (Weight: 0.1)">
+    Prefers accounts that have rested longer:
+    
+    - Score increases with time since last use
+    - Capped at 1 hour (3600 seconds)
+    - Prevents account "starvation"
+    - Lower weight ensures other signals dominate
+  </Accordion>
+</AccordionGroup>
+
+**Fallback Levels:**
+
+When no accounts pass all filters, hybrid strategy progressively relaxes constraints:
+
+1. **Normal**: All filters active (health + tokens + quota)
+2. **Quota Fallback**: Bypasses quota filter (better to use critical quota than fail)
+3. **Emergency Fallback**: Bypasses health filter + adds 250ms throttle delay
+4. **Last Resort**: Bypasses health AND token filters + adds 500ms throttle delay
+
+### Sticky Strategy
+
+Optimized for prompt caching by maintaining account continuity:
+
+**Behavior:**
+- Stays on current account until it becomes unavailable
+- Waits up to 2 minutes for short rate limits before switching
+- Only switches when:
+  - Current account rate-limited for > 2 minutes
+  - Current account is invalid/disabled
+  - Another account is available immediately
+
+**Best For:**
+- Long conversations with context reuse
+- Maximizing `cache_read_input_tokens`
+- Reducing costs via prompt caching
+
+<Tip>
+**Prompt Cache Continuity**
+
+Sticky strategy maintains session ID consistency by staying on the same account. Session IDs are derived from the first user message hash, ensuring cache hits across conversation turns.
+</Tip>
+
+### Round-Robin Strategy
+
+Maximizes throughput by distributing load evenly:
+
+**Behavior:**
+- Rotates to next account on every request
+- Skips rate-limited, invalid, or disabled accounts
+- Returns to first account after reaching the end
+
+**Best For:**
+- High-volume concurrent requests
+- Minimizing per-account rate limit hits
+- Testing with multiple accounts
+
+<Warning>
+Round-robin breaks prompt cache continuity since each request may use a different account (different organization scope).
+</Warning>
+
+## Quota Protection
+
+Set minimum quota thresholds to switch accounts before quota runs out:
+
+<Steps>
+  <Step title="Global Threshold">
+    Server-wide default for all accounts and models:
+    
+    **Web Console**: Settings → Quota Protection → Global Threshold
+    
+    **Config File** (`~/.config/antigravity-proxy/accounts.json`):
+    ```json
+    {
+      "settings": {
+        "globalQuotaThreshold": 0.10  // Switch at 10% remaining
+      }
+    }
+    ```
+    
+    Default: `0` (disabled)
+  </Step>
+  
+  <Step title="Per-Account Threshold">
+    Override global threshold for specific accounts:
+    
+    **Web Console**: Accounts tab → Account card → Settings → Quota Threshold
+    
+    **Config File**:
+    ```json
+    {
+      "accounts": [
+        {
+          "email": "user@gmail.com",
+          "quotaThreshold": 0.20  // Switch at 20% for this account
+        }
+      ]
+    }
+    ```
+  </Step>
+  
+  <Step title="Per-Model Threshold">
+    Set different thresholds for specific models on an account:
+    
+    **Web Console**: Models tab → Drag threshold markers on quota bars
+    
+    **Config File**:
+    ```json
+    {
+      "accounts": [
+        {
+          "email": "user@gmail.com",
+          "modelQuotaThresholds": {
+            "claude-opus-4-6-thinking": 0.25,  // 25% for Opus
+            "gemini-3-flash": 0.05             // 5% for Gemini
+          }
+        }
+      ]
+    }
+    ```
+  </Step>
+</Steps>
+
+<Info>
+**Priority Order**: Per-model > Per-account > Global > Default (0)
+
+Thresholds are fractions (0-0.99) stored in config, displayed as percentages (0-99%) in UI.
+</Info>
+
+## Session ID and Caching
+
+The proxy derives session IDs from conversation context to enable prompt caching:
+
+**How It Works:**
+1. Session ID = SHA256 hash of first user message content
+2. Same session ID used across conversation turns
+3. Cache is organization-scoped (requires same account)
+4. `cache_read_input_tokens` returned when cache hits
+
+**Strategy Impact:**
+
+| Strategy | Session Consistency | Cache Hit Rate |
+|----------|--------------------|-----------------|
+| **Sticky** | Excellent - same account throughout | Very High |
+| **Hybrid** | Moderate - changes based on scoring | Medium |
+| **Round-Robin** | Poor - rotates every request | Very Low |
+
+<Tip>
+For conversations where you want to maximize caching, use sticky strategy:
+```bash
+acc start --strategy=sticky
+```
+</Tip>
+
+## Rate Limit Handling
+
+### Automatic Cooldown
+
+Rate-limited accounts are automatically excluded until reset time:
+
+1. **Detection**: 429 errors or RESOURCE_EXHAUSTED from API
+2. **Parse Reset Time**: Extract from headers or error body
+3. **Mark Account**: Set `modelRateLimits[modelId].isRateLimited = true`
+4. **Auto-Recovery**: Clear flag when `resetTime` expires
+
+### Model-Specific Rate Limits
+
+Rate limits are tracked per model, per account:
+
+```json
+{
+  "email": "user@gmail.com",
+  "modelRateLimits": {
+    "claude-opus-4-6-thinking": {
+      "isRateLimited": true,
+      "resetTime": 1709467800000,  // Unix timestamp
+      "lastError": "RESOURCE_EXHAUSTED"
+    }
+  }
+}
+```
+
+An account rate-limited on Opus can still be used for Sonnet or Gemini models.
+
+## Monitoring Account Health
+
+### Web Console Dashboard
+
+The Accounts tab shows real-time health data:
+
+- **Health Score**: Current health points (0-100)
+- **Token Bucket**: Available tokens / max tokens
+- **Quota Bars**: Per-model quota with threshold markers
+- **Rate Limit Status**: Active rate limits with countdown
+- **Last Used**: Timestamp of most recent request
+
+### Health Inspector (Developer Mode)
+
+Enable Developer Mode to see detailed strategy metrics:
+
+1. Settings → Developer Mode → Enable
+2. Accounts tab → **Health Inspector** panel appears
+3. Shows per-account:
+   - Health score and history
+   - Token bucket state
+   - Failure/success counts
+   - LRU timestamps
+
+### API Endpoint
+
+```bash
+# Requires Developer Mode enabled
+curl http://localhost:8080/api/strategy/health
+```
+
+Returns:
+```json
+{
+  "strategy": "hybrid",
+  "accounts": [
+    {
+      "email": "user@gmail.com",
+      "health": 85,
+      "tokens": 42,
+      "maxTokens": 50,
+      "lastUsed": 1709377800000,
+      "failures": 2,
+      "successes": 47
+    }
+  ]
+}
+```
+
+## CLI Management Reference
+
+Monitor and manage accounts via CLI:
+
+```bash
+# List all accounts with status
+antigravity-claude-proxy accounts list
+
+# Verify tokens are valid
+antigravity-claude-proxy accounts verify
+
+# Check quota and limits (table format)
+curl "http://localhost:8080/account-limits?format=table"
+
+# Interactive account menu
+antigravity-claude-proxy accounts
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="For Long Conversations">
+    Use **sticky strategy** to maximize prompt cache hits:
+    ```bash
+    acc start --strategy=sticky
+    ```
+    
+    Set per-account quota thresholds to ensure you don't lose cache mid-conversation:
+    ```json
+    {
+      "quotaThreshold": 0.15  // Switch at 15%
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="For High-Volume Usage">
+    Use **round-robin** or **hybrid** strategy:
+    ```bash
+    acc start --strategy=round-robin
+    ```
+    
+    Add multiple accounts to distribute load:
+    ```bash
+    antigravity-claude-proxy accounts add
+    ```
+  </Accordion>
+  
+  <Accordion title="For Production Deployments">
+    Use **hybrid strategy** (default) with quota protection:
+    
+    1. Set global quota threshold:
+       ```json
+       {"globalQuotaThreshold": 0.10}
+       ```
+    2. Monitor health via web console or API
+    3. Set up alerts for account failures
+    4. Add redundant accounts for failover
+  </Accordion>
+  
+  <Accordion title="For Mixed Workloads">
+    Use **hybrid strategy** and configure per-model thresholds:
+    
+    - High threshold for expensive models (Opus): 25%
+    - Low threshold for cheap models (Flash): 5%
+    
+    ```json
+    {
+      "modelQuotaThresholds": {
+        "claude-opus-4-6-thinking": 0.25,
+        "gemini-3-flash": 0.05
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="All accounts rate-limited">
+    Check reset times in web console. If all accounts are exhausted:
+    
+    1. Wait for reset time (usually 1 hour)
+    2. Add more accounts to increase quota pool
+    3. Reduce request volume or use cheaper models
+    
+    Hybrid strategy will enter "last resort" mode with throttling delays.
+  </Accordion>
+  
+  <Accordion title="Quota depleting too quickly">
+    Set quota protection thresholds:
+    
+    1. Global: Settings → Quota Protection
+    2. Per-account: Account settings modal
+    3. Per-model: Drag markers on quota bars
+    
+    Accounts will switch before quota runs out.
+  </Accordion>
+  
+  <Accordion title="Strategy not switching accounts">
+    If using **sticky strategy**:
+    - Check if current account is rate-limited
+    - Verify other accounts are enabled and valid
+    - Strategy waits up to 2 minutes for short rate limits
+    
+    If using **hybrid strategy**:
+    - Check health scores in Health Inspector
+    - Verify token buckets aren't depleted
+    - Check quota thresholds aren't excluding all accounts
+  </Accordion>
+  
+  <Accordion title="Health scores stuck at low values">
+    Health scores recover passively over time (+1 per 5 minutes). To reset:
+    
+    1. Restart the proxy server:
+       ```bash
+       acc restart
+       ```
+    2. Or wait for passive recovery
+    3. Successful requests give +5 points immediately
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Account Management" icon="users" href="/guides/account-management">
+    Add and configure Google accounts
+  </Card>
+  <Card title="Web Console" icon="browser" href="/guides/web-console">
+    Monitor usage and health visually
+  </Card>
+  <Card title="Available Models" icon="brain" href="/configuration/models">
+    Explore supported Claude and Gemini models
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/overview">
+    Programmatic access to proxy endpoints
+  </Card>
+</CardGroup>

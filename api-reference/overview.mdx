@@ -1,0 +1,110 @@
+---
+title: 'API Overview'
+description: 'Anthropic-compatible API for Claude and Gemini models'
+---
+
+## Base URL
+
+```
+http://localhost:8080
+```
+
+The default port is 8080. You can configure this via the `PORT` environment variable or in `config.json`.
+
+## API Compatibility
+
+Antigravity Claude Proxy provides an **Anthropic Messages API-compatible** interface. This means you can use the proxy as a drop-in replacement for the official Anthropic API by:
+
+1. Setting `ANTHROPIC_BASE_URL=http://localhost:8080`
+2. Setting `ANTHROPIC_AUTH_TOKEN=test` (or any value if API key auth is disabled)
+
+The proxy translates requests from Anthropic format → Google Generative AI format → Antigravity Cloud Code API, then converts responses back to Anthropic format.
+
+## Request/Response Format
+
+All API requests use **JSON** payloads with `Content-Type: application/json`.
+
+Responses follow the Anthropic Messages API format:
+
+```json
+{
+  "id": "msg_01...",
+  "type": "message",
+  "role": "assistant",
+  "content": [...],
+  "model": "claude-sonnet-4-5-thinking",
+  "stop_reason": "end_turn",
+  "usage": {
+    "input_tokens": 150,
+    "output_tokens": 250
+  }
+}
+```
+
+## Available Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Messages" icon="message" href="/api-reference/messages">
+    Send messages to Claude or Gemini models
+  </Card>
+  <Card title="Models" icon="brain" href="/api-reference/models">
+    List available models
+  </Card>
+  <Card title="Health" icon="heart-pulse" href="/api-reference/health">
+    Check server and account health
+  </Card>
+  <Card title="Authentication" icon="key" href="/api-reference/authentication">
+    Configure API authentication
+  </Card>
+</CardGroup>
+
+## Streaming Support
+
+The proxy supports **Server-Sent Events (SSE)** for streaming responses. Set `stream: true` in your request to receive incremental updates as the model generates its response.
+
+See the [Messages endpoint](/api-reference/messages#streaming) for details.
+
+## Model Support
+
+### Claude Models
+- `claude-opus-4-6-thinking` - Extended reasoning, highest capability
+- `claude-sonnet-4-5-thinking` - Balanced reasoning and speed
+- `claude-sonnet-4-5` - Fast, production-ready
+
+### Gemini Models
+- `gemini-3.1-pro-high` - Highest quality Gemini
+- `gemini-3.1-pro-low` - Cost-optimized Gemini
+- `gemini-3-flash` - Fastest Gemini model
+
+Use `GET /v1/models` to see all available models in your accounts.
+
+## Error Handling
+
+Errors follow the Anthropic API format:
+
+```json
+{
+  "type": "error",
+  "error": {
+    "type": "invalid_request_error",
+    "message": "messages is required and must be an array"
+  }
+}
+```
+
+### Error Types
+
+- `authentication_error` - Invalid or missing API key (if auth is enabled)
+- `invalid_request_error` - Malformed request or invalid parameters
+- `api_error` - Upstream API error or network issue
+- `not_found_error` - Endpoint not found
+
+## Rate Limiting
+
+The proxy automatically handles rate limits across multiple accounts:
+
+- When an account is rate-limited, the proxy switches to another available account
+- Rate limit state is tracked per model
+- Accounts are automatically re-enabled when their quota resets
+
+You can monitor account status via the [Health endpoint](/api-reference/health) or the Web UI.

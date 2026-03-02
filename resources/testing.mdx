@@ -1,0 +1,69 @@
+---
+title: Testing
+description: How to run tests for Antigravity Claude Proxy
+---
+
+## Running Tests
+
+<Warning>
+  The server must be running on port 8080 before running tests.
+</Warning>
+
+Run the complete test suite:
+
+```bash
+# Start server in one terminal
+npm start
+
+# Run tests in another terminal
+npm test
+```
+
+## Individual Test Suites
+
+You can run specific test suites individually:
+
+```bash
+npm run test:signatures    # Thinking signatures
+npm run test:multiturn     # Multi-turn with tools
+npm run test:streaming     # Streaming SSE events
+npm run test:interleaved   # Interleaved thinking
+npm run test:images        # Image processing
+npm run test:caching       # Prompt caching
+npm run test:strategies    # Account selection strategies
+npm run test:cache-control # Cache control field stripping
+npm run test:crossmodel    # Cross-model thinking signatures
+npm run test:oauth         # OAuth no-browser mode
+```
+
+## Test Coverage
+
+The test suite covers:
+
+- **Thinking Signatures**: Validates thinking block signatures for Claude and Gemini models
+- **Multi-turn Conversations**: Tests tool use and multi-turn dialogue flows
+- **Streaming**: Verifies Server-Sent Events (SSE) streaming functionality
+- **Interleaved Thinking**: Tests thinking blocks interspersed with content
+- **Image Processing**: Validates image input handling and conversion
+- **Prompt Caching**: Tests cache_read_input_tokens and session ID continuity
+- **Account Strategies**: Unit tests for sticky, round-robin, and hybrid strategies
+- **Cache Control**: Ensures cache_control fields are properly stripped from requests
+- **Cross-Model Switching**: Validates signature handling when switching between Claude and Gemini
+- **OAuth**: Tests headless OAuth flow with manual code input
+
+## Test Architecture
+
+- Tests are CommonJS files (`.cjs`) located in the `tests/` directory
+- They make HTTP requests to the local proxy server
+- Shared test utilities are in `tests/helpers/http-client.cjs`
+- Test runner supports filtering: `node tests/run-all.cjs <filter>`
+
+## Strategy Unit Tests
+
+Strategy tests don't require a running server:
+
+```bash
+node tests/test-strategies.cjs
+```
+
+These tests validate the account selection logic for all three strategies (sticky, round-robin, hybrid).

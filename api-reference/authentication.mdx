@@ -1,0 +1,198 @@
+---
+title: 'Authentication'
+description: 'Configure API authentication for the proxy'
+---
+
+## Overview
+
+Antigravity Claude Proxy supports **optional API key authentication** for the `/v1/*` endpoints. By default, authentication is **disabled** and the proxy uses its own configured Google accounts.
+
+## Default Behavior (No Auth)
+
+When API key authentication is not configured:
+
+- All `/v1/*` endpoints are **publicly accessible**
+- The proxy uses its own pool of Google accounts
+- No `Authorization` header is required
+
+```bash
+curl -X POST http://localhost:8080/v1/messages \
+  -H "Content-Type: application/json" \
+  -d '{"model": "claude-sonnet-4-5-thinking", "messages": [...]}'
+```
+
+## Enabling API Key Authentication
+
+To secure your proxy, set the `API_KEY` environment variable or configure it in `config.json`:
+
+### Environment Variable
+
+```bash
+export API_KEY="your-secret-api-key"
+npm start
+```
+
+### Config File
+
+Edit `~/.config/antigravity-proxy/config.json`:
+
+```json
+{
+  "apiKey": "your-secret-api-key"
+}
+```
+
+<Warning>
+  Store your API key securely. Do not commit it to version control.
+</Warning>
+
+## Using the API Key
+
+Once authentication is enabled, include the API key in every request using the `Authorization` header:
+
+### Bearer Token (Recommended)
+
+```bash
+curl -X POST http://localhost:8080/v1/messages \
+  -H "Authorization: Bearer your-secret-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "claude-sonnet-4-5-thinking", "messages": [...]}'
+```
+
+### X-API-Key Header
+
+Alternatively, use the `X-API-Key` header:
+
+```bash
+curl -X POST http://localhost:8080/v1/messages \
+  -H "X-API-Key: your-secret-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "claude-sonnet-4-5-thinking", "messages": [...]}'
+```
+
+## Claude Code Integration
+
+When using Claude Code CLI, set the `ANTHROPIC_AUTH_TOKEN` environment variable:
+
+```bash
+export ANTHROPIC_BASE_URL=http://localhost:8080
+export ANTHROPIC_AUTH_TOKEN="your-secret-api-key"
+```
+
+Or configure via `~/.claude/settings.json`:
+
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://localhost:8080",
+    "ANTHROPIC_AUTH_TOKEN": "your-secret-api-key"
+  }
+}
+```
+
+<Tip>
+  If authentication is **disabled** on the proxy, you can use any value for `ANTHROPIC_AUTH_TOKEN` (e.g., `"test"`).
+</Tip>
+
+## Error Responses
+
+### 401 Unauthorized - Missing API Key
+
+Returned when API key is required but not provided:
+
+```json
+{
+  "type": "error",
+  "error": {
+    "type": "authentication_error",
+    "message": "Invalid or missing API key"
+  }
+}
+```
+
+### 401 Unauthorized - Invalid API Key
+
+Returned when the provided API key does not match:
+
+```json
+{
+  "type": "error",
+  "error": {
+    "type": "authentication_error",
+    "message": "Invalid or missing API key"
+  }
+}
+```
+
+## Security Best Practices
+
+### 1. Use Strong API Keys
+
+Generate a random API key using:
+
+```bash
+openssl rand -base64 32
+```
+
+### 2. Rotate Keys Regularly
+
+Update your API key periodically:
+
+```bash
+# Generate new key
+export NEW_API_KEY=$(openssl rand -base64 32)
+
+# Update config
+echo '{"apiKey": "'$NEW_API_KEY'"}' > ~/.config/antigravity-proxy/config.json
+
+# Restart server
+npm start
+```
+
+### 3. Use HTTPS in Production
+
+For production deployments, run the proxy behind a reverse proxy with HTTPS:
+
+```nginx
+server {
+  listen 443 ssl;
+  server_name proxy.example.com;
+
+  ssl_certificate /path/to/cert.pem;
+  ssl_certificate_key /path/to/key.pem;
+
+  location / {
+    proxy_pass http://localhost:8080;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+  }
+}
+```
+
+### 4. Web UI Password Protection
+
+The Web UI supports **optional password protection** via the `WEBUI_PASSWORD` environment variable:
+
+```bash
+export WEBUI_PASSWORD="admin-password"
+npm start
+```
+
+Clients must include the password via:
+
+- Header: `X-WebUI-Password: admin-password`
+- Query param: `?password=admin-password`
+
+<Note>
+  WebUI password protection is separate from API key authentication. You can enable one or both.
+</Note>
+
+## Account Authentication
+
+The proxy uses **Google OAuth** to authenticate with Google accounts:
+
+- Accounts are added via the Web UI or CLI (`npm run accounts:add`)
+- OAuth tokens are stored in `~/.config/antigravity-proxy/accounts.json`
+- Tokens are automatically refreshed when expired
+
+See the [Account Management](/guides/account-management) guide for details.

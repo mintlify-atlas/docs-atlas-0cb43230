@@ -1,0 +1,534 @@
+---
+title: "Advanced Configuration"
+description: "Environment variables, config files, and fine-tuning options"
+icon: "sliders"
+---
+
+Customize Antigravity Claude Proxy's behavior through environment variables, configuration files, or the Web Console.
+
+## Configuration Priority
+
+Settings are applied in the following order (highest to lowest priority):
+
+1. **Environment variables** (e.g., `PORT=3000`)
+2. **Config file** (`~/.config/antigravity-proxy/config.json`)
+3. **Default values** (built-in defaults)
+
+<Tip>
+Most users can configure everything through the **Web Console** at `http://localhost:8080` without editing files directly.
+</Tip>
+
+## Environment Variables
+
+### Server Configuration
+
+<ParamField path="PORT" type="number" default="8080">
+  HTTP server port. The proxy listens on this port for API requests.
+  
+  ```bash
+  PORT=3000 npm start
+  ```
+</ParamField>
+
+<ParamField path="HOST" type="string" default="0.0.0.0">
+  Bind address. Use `127.0.0.1` to restrict to localhost only.
+  
+  ```bash
+  HOST=127.0.0.1 npm start
+  ```
+</ParamField>
+
+### Security
+
+<ParamField path="API_KEY" type="string" default="">
+  Protect `/v1/*` API endpoints with a bearer token. When set, clients must include `Authorization: Bearer YOUR_API_KEY`.
+  
+  ```bash
+  API_KEY=your-secret-key npm start
+  ```
+  
+  <Warning>
+    Keep this value secret. Do not commit it to version control.
+  </Warning>
+</ParamField>
+
+<ParamField path="WEBUI_PASSWORD" type="string" default="">
+  Password-protect the Web Console. Users will be prompted to enter this password when accessing the dashboard.
+  
+  ```bash
+  WEBUI_PASSWORD=admin123 npm start
+  ```
+</ParamField>
+
+### Proxy & Network
+
+<ParamField path="HTTP_PROXY" type="string" default="">
+  Route outbound API requests through an HTTP proxy. Useful for corporate firewalls or debugging.
+  
+  ```bash
+  # Route through local proxy
+  HTTP_PROXY=http://127.0.0.1:8888 npm start
+  
+  # Corporate proxy with auth
+  HTTP_PROXY=http://user:pass@proxy.company.com:3128 npm start
+  ```
+</ParamField>
+
+<ParamField path="HTTPS_PROXY" type="string" default="">
+  Same as `HTTP_PROXY` but for HTTPS requests. Both variables are supported (case-insensitive).
+</ParamField>
+
+### Developer Mode
+
+<ParamField path="DEV_MODE" type="boolean" default="false">
+  Enable developer mode with debug logging and advanced features.
+  
+  ```bash
+  DEV_MODE=true npm start
+  ```
+  
+  When enabled:
+  - Debug logs are printed to console
+  - `/api/strategy/health` endpoint is accessible
+  - Dev tools panel is visible in WebUI
+  - Screenshot mode and placeholder data are available
+</ParamField>
+
+<ParamField path="DEBUG" type="boolean" default="false">
+  Legacy alias for `DEV_MODE`. Setting `DEBUG=true` automatically enables developer mode.
+  
+  ```bash
+  DEBUG=true npm start
+  ```
+</ParamField>
+
+### Model Fallback
+
+<ParamField path="FALLBACK" type="boolean" default="false">
+  Enable automatic model fallback when quota is exhausted. See [Fallback Strategy](/configuration/fallback-strategy) for details.
+  
+  ```bash
+  FALLBACK=true npm start
+  # Or use CLI flag
+  npm start -- --fallback
+  ```
+</ParamField>
+
+### systemd / Service Deployments
+
+<ParamField path="CLAUDE_CONFIG_PATH" type="string" default="~/.claude">
+  Path to the `.claude` directory containing `settings.json`. Required when running as a systemd service.
+  
+  **Problem**: When running as a systemd service, `os.homedir()` returns the service user's home (e.g., `/root`), not the real user's home.
+  
+  **Solution**: Set this variable to the real user's `.claude` directory.
+  
+  ```bash
+  CLAUDE_CONFIG_PATH=/home/username/.claude npm start
+  ```
+  
+  Example systemd service file:
+  
+  ```ini
+  [Service]
+  User=myuser
+  Environment="CLAUDE_CONFIG_PATH=/home/myuser/.claude"
+  ExecStart=/usr/bin/npm start
+  ```
+</ParamField>
+
+### OAuth Callback Port
+
+<ParamField path="OAUTH_CALLBACK_PORT" type="number" default="51121">
+  Port for OAuth callback server during account authentication. Windows users may need to change this if the default port is reserved by Hyper-V/WSL2.
+  
+  ```bash
+  OAUTH_CALLBACK_PORT=51122 npm run accounts:add
+  ```
+  
+  Fallback ports: `51122`, `51123`, `51124`, `51125`, `51126`
+</ParamField>
+
+## Config File Structure
+
+The config file is located at `~/.config/antigravity-proxy/config.json`. It is created automatically on first run.
+
+### Example config.json
+
+```json
+{
+  "apiKey": "",
+  "webuiPassword": "",
+  "debug": false,
+  "devMode": false,
+  "logLevel": "info",
+  "maxRetries": 5,
+  "retryBaseMs": 1000,
+  "retryMaxMs": 30000,
+  "defaultCooldownMs": 10000,
+  "maxWaitBeforeErrorMs": 120000,
+  "maxAccounts": 10,
+  "globalQuotaThreshold": 0,
+  "requestThrottlingEnabled": false,
+  "requestDelayMs": 200,
+  "accountSelection": {
+    "strategy": "hybrid",
+    "healthScore": {
+      "initial": 70,
+      "successReward": 1,
+      "rateLimitPenalty": -10,
+      "failurePenalty": -20,
+      "recoveryPerHour": 10,
+      "minUsable": 50,
+      "maxScore": 100
+    },
+    "tokenBucket": {
+      "maxTokens": 50,
+      "tokensPerMinute": 6,
+      "initialTokens": 50
+    },
+    "quota": {
+      "lowThreshold": 0.10,
+      "criticalThreshold": 0.05,
+      "staleMs": 300000
+    },
+    "weights": {
+      "health": 2,
+      "tokens": 5,
+      "quota": 3,
+      "lru": 0.1
+    }
+  }
+}
+```
+
+### Retry & Rate Limiting
+
+<ParamField path="maxRetries" type="number" default="5">
+  Maximum number of retry attempts for failed requests.
+</ParamField>
+
+<ParamField path="retryBaseMs" type="number" default="1000">
+  Base delay in milliseconds for exponential backoff.
+</ParamField>
+
+<ParamField path="retryMaxMs" type="number" default="30000">
+  Maximum retry delay in milliseconds (30 seconds).
+</ParamField>
+
+<ParamField path="defaultCooldownMs" type="number" default="10000">
+  Default cooldown period after rate limit errors (10 seconds).
+</ParamField>
+
+<ParamField path="maxWaitBeforeErrorMs" type="number" default="120000">
+  Maximum time to wait before giving up and returning an error (2 minutes).
+</ParamField>
+
+<ParamField path="rateLimitDedupWindowMs" type="number" default="2000">
+  Deduplication window to prevent concurrent retry storms (2 seconds).
+</ParamField>
+
+<ParamField path="maxConsecutiveFailures" type="number" default="3">
+  Number of consecutive failures before applying extended cooldown.
+</ParamField>
+
+<ParamField path="extendedCooldownMs" type="number" default="60000">
+  Extended cooldown period after repeated failures (1 minute).
+</ParamField>
+
+<ParamField path="switchAccountDelayMs" type="number" default="5000">
+  Delay before switching accounts after a rate limit (5 seconds).
+</ParamField>
+
+### Capacity & Backoff
+
+<ParamField path="maxCapacityRetries" type="number" default="5">
+  Maximum retries for model capacity exhaustion errors.
+</ParamField>
+
+<ParamField path="capacityBackoffTiersMs" type="array" default="[5000, 10000, 20000, 30000, 60000]">
+  Progressive backoff tiers for capacity exhaustion (in milliseconds).
+  
+  ```json
+  "capacityBackoffTiersMs": [5000, 10000, 20000, 30000, 60000]
+  ```
+</ParamField>
+
+### Account Management
+
+<ParamField path="maxAccounts" type="number" default="10">
+  Maximum number of Google accounts allowed (1-100). Configurable via WebUI.
+</ParamField>
+
+<ParamField path="globalQuotaThreshold" type="number" default="0">
+  Global minimum quota fraction before switching accounts.
+  
+  - `0` = Disabled (use quota until exhausted)
+  - `0.01` to `0.99` = Switch when quota drops below this fraction
+  - Example: `0.10` = Switch when quota falls below 10%
+  
+  <Note>
+    This can be overridden per-account and per-model in the Web Console.
+  </Note>
+</ParamField>
+
+<ParamField path="requestThrottlingEnabled" type="boolean" default="false">
+  Enable delay before each Google API request (opt-in). Helps prevent rate limits in high-concurrency scenarios.
+</ParamField>
+
+<ParamField path="requestDelayMs" type="number" default="200">
+  Delay in milliseconds when request throttling is enabled (100-5000ms).
+</ParamField>
+
+### Account Selection Strategy
+
+The `accountSelection` object configures the [load balancing strategy](/guides/load-balancing).
+
+<ParamField path="accountSelection.strategy" type="string" default="hybrid">
+  Account selection algorithm:
+  
+  - `sticky`: Cache-optimized (stays on same account)
+  - `round-robin`: Load-balanced (rotates every request)
+  - `hybrid`: Smart distribution (default)
+  
+  ```bash
+  npm start -- --strategy=sticky
+  ```
+</ParamField>
+
+#### Hybrid Strategy Tuning
+
+These settings only apply when `strategy` is set to `hybrid`.
+
+<ParamField path="accountSelection.healthScore" type="object">
+  Health scoring configuration:
+  
+  - `initial` (70): Starting score for new accounts
+  - `successReward` (1): Points added on successful request
+  - `rateLimitPenalty` (-10): Points subtracted on rate limit
+  - `failurePenalty` (-20): Points subtracted on other failures
+  - `recoveryPerHour` (10): Passive recovery rate
+  - `minUsable` (50): Minimum score to be selected
+  - `maxScore` (100): Maximum score cap
+</ParamField>
+
+<ParamField path="accountSelection.tokenBucket" type="object">
+  Client-side rate limiting via token bucket:
+  
+  - `maxTokens` (50): Maximum token capacity
+  - `tokensPerMinute` (6): Regeneration rate
+  - `initialTokens` (50): Starting tokens for new accounts
+</ParamField>
+
+<ParamField path="accountSelection.quota" type="object">
+  Quota awareness thresholds:
+  
+  - `lowThreshold` (0.10): Reduce score when quota falls below 10%
+  - `criticalThreshold` (0.05): Exclude from selection below 5%
+  - `staleMs` (300000): Max age of quota data to trust (5 minutes)
+</ParamField>
+
+<ParamField path="accountSelection.weights" type="object">
+  Component weights for score calculation:
+  
+  - `health` (2): Weight for health score component
+  - `tokens` (5): Weight for token bucket component
+  - `quota` (3): Weight for quota awareness component
+  - `lru` (0.1): Weight for LRU freshness component
+  
+  **Scoring formula**:
+  ```
+  score = (Health × 2) + ((Tokens / MaxTokens × 100) × 5) + (Quota × 3) + (LRU × 0.1)
+  ```
+</ParamField>
+
+## Quota Threshold Configuration
+
+Quota thresholds protect accounts from complete exhaustion by switching to another account when quota drops below a configurable level.
+
+### Three-Tier Resolution
+
+Thresholds are checked in priority order:
+
+1. **Per-model** (`account.modelQuotaThresholds[modelId]`)
+2. **Per-account** (`account.quotaThreshold`)
+3. **Global** (`config.globalQuotaThreshold`)
+
+<CodeGroup>
+
+```json Global Threshold
+{
+  "globalQuotaThreshold": 0.10  // 10% minimum for all accounts/models
+}
+```
+
+```json Per-Account Override
+{
+  "email": "user@example.com",
+  "quotaThreshold": 0.20  // 20% minimum for this account
+}
+```
+
+```json Per-Model Override
+{
+  "email": "user@example.com",
+  "quotaThreshold": 0.20,
+  "modelQuotaThresholds": {
+    "claude-opus-4-6-thinking": 0.30  // 30% minimum for Opus only
+  }
+}
+```
+
+</CodeGroup>
+
+### Configuring via WebUI
+
+<Steps>
+  <Step title="Global threshold">
+    Navigate to **Settings → Server** and adjust the **Global Quota Threshold** slider (0-99%).
+  </Step>
+  
+  <Step title="Per-account threshold">
+    1. Go to **Accounts**
+    2. Click the settings icon next to an account
+    3. Adjust the **Account Quota Threshold** slider
+  </Step>
+  
+  <Step title="Per-model threshold">
+    1. Go to **Models**
+    2. Drag the colored markers on quota bars to set per-account thresholds for each model
+    3. Markers are color-coded by account
+  </Step>
+</Steps>
+
+## Server Presets
+
+The proxy includes built-in presets optimized for different scenarios. Access them via **Settings → Server** in the WebUI.
+
+### Default (3-5 Accounts)
+
+Balanced settings for most users:
+
+- **Strategy**: Hybrid
+- **Max retries**: 5
+- **Max wait**: 2 minutes
+- **Account selection**: Balanced weights
+
+### Many Accounts (10+)
+
+Optimized for high account counts:
+
+- **Strategy**: Hybrid
+- **Max retries**: 3 (faster failures)
+- **Max wait**: 1 minute
+- **Account selection**: Prioritizes health over LRU
+
+### Conservative
+
+Maximum reliability with longer waits:
+
+- **Strategy**: Sticky (best for caching)
+- **Max retries**: 8
+- **Max wait**: 4 minutes
+- **Account selection**: Gentle penalties, slow recovery
+
+## Editing the Config File
+
+You can edit the config file manually or through the WebUI.
+
+<Tabs>
+  <Tab title="WebUI (Recommended)">
+    1. Open `http://localhost:8080`
+    2. Navigate to **Settings → Server**
+    3. Adjust settings using sliders and dropdowns
+    4. Changes are saved automatically
+  </Tab>
+  
+  <Tab title="Manual Editing">
+    1. Open `~/.config/antigravity-proxy/config.json` in a text editor
+    2. Edit the desired fields
+    3. Restart the proxy to apply changes
+    
+    ```bash
+    # Edit config
+    nano ~/.config/antigravity-proxy/config.json
+    
+    # Restart proxy
+    npm start
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+Manual edits to `config.json` may be overwritten by WebUI changes. Use the WebUI for real-time configuration updates.
+</Warning>
+
+## systemd Service Setup
+
+When running the proxy as a systemd service, set the `CLAUDE_CONFIG_PATH` environment variable to the real user's `.claude` directory.
+
+### Example Service File
+
+```ini /etc/systemd/system/antigravity-proxy.service
+[Unit]
+Description=Antigravity Claude Proxy
+After=network.target
+
+[Service]
+Type=simple
+User=myuser
+WorkingDirectory=/home/myuser/antigravity-claude-proxy
+Environment="NODE_ENV=production"
+Environment="CLAUDE_CONFIG_PATH=/home/myuser/.claude"
+Environment="PORT=8080"
+ExecStart=/usr/bin/npm start
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### Enable and Start
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable antigravity-proxy
+sudo systemctl start antigravity-proxy
+sudo systemctl status antigravity-proxy
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Changes not taking effect">
+    1. Check that you're editing the correct config file (`~/.config/antigravity-proxy/config.json`)
+    2. Restart the proxy after manual edits
+    3. Environment variables override config file settings
+  </Accordion>
+  
+  <Accordion title="Port already in use">
+    Change the port using the `PORT` environment variable:
+    
+    ```bash
+    PORT=3000 npm start
+    ```
+  </Accordion>
+  
+  <Accordion title="OAuth callback fails on Windows">
+    Windows may reserve ports 49152-65535 for Hyper-V/WSL2. Set `OAUTH_CALLBACK_PORT` to a lower port:
+    
+    ```bash
+    OAUTH_CALLBACK_PORT=51122 npm run accounts:add
+    ```
+  </Accordion>
+  
+  <Accordion title="Config file not found">
+    The config file is created automatically on first run. If it's missing:
+    
+    ```bash
+    mkdir -p ~/.config/antigravity-proxy
+    echo '{}' > ~/.config/antigravity-proxy/config.json
+    ```
+  </Accordion>
+</AccordionGroup>

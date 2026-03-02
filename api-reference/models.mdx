@@ -1,0 +1,200 @@
+---
+title: 'GET /v1/models'
+description: 'List available models'
+---
+
+## Endpoint
+
+```
+GET /v1/models
+```
+
+Retrieve a list of all models available across your configured accounts.
+
+## Request
+
+No parameters required. This is a simple GET request.
+
+```bash
+curl http://localhost:8080/v1/models
+```
+
+## Response
+
+<ResponseField name="object" type="string">
+  Always `"list"`.
+</ResponseField>
+
+<ResponseField name="data" type="array">
+  Array of model objects. Each model has:
+  
+  - `id` (string): Model identifier (e.g., `"claude-sonnet-4-5-thinking"`)
+  - `object` (string): Always `"model"`
+  - `created` (number): Timestamp when model was added
+  - `owned_by` (string): Model provider (`"anthropic"` or `"google"`)
+</ResponseField>
+
+## Example Response
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "claude-opus-4-6-thinking",
+      "object": "model",
+      "created": 1704067200,
+      "owned_by": "anthropic"
+    },
+    {
+      "id": "claude-sonnet-4-5-thinking",
+      "object": "model",
+      "created": 1704067200,
+      "owned_by": "anthropic"
+    },
+    {
+      "id": "claude-sonnet-4-5",
+      "object": "model",
+      "created": 1704067200,
+      "owned_by": "anthropic"
+    },
+    {
+      "id": "gemini-3.1-pro-high",
+      "object": "model",
+      "created": 1704067200,
+      "owned_by": "google"
+    },
+    {
+      "id": "gemini-3.1-pro-low",
+      "object": "model",
+      "created": 1704067200,
+      "owned_by": "google"
+    },
+    {
+      "id": "gemini-3-flash",
+      "object": "model",
+      "created": 1704067200,
+      "owned_by": "google"
+    }
+  ]
+}
+```
+
+## Model Details
+
+### Claude Models
+
+<AccordionGroup>
+  <Accordion title="claude-opus-4-6-thinking">
+    **Provider**: Anthropic  
+    **Capabilities**: Extended reasoning, highest intelligence  
+    **Best for**: Complex problem-solving, deep analysis  
+    **Thinking**: Supported  
+    **Max tokens**: 4096 (configurable via `max_tokens`)
+  </Accordion>
+
+  <Accordion title="claude-sonnet-4-5-thinking">
+    **Provider**: Anthropic  
+    **Capabilities**: Balanced reasoning and speed  
+    **Best for**: General-purpose tasks with reasoning  
+    **Thinking**: Supported  
+    **Max tokens**: 4096 (configurable via `max_tokens`)
+  </Accordion>
+
+  <Accordion title="claude-sonnet-4-5">
+    **Provider**: Anthropic  
+    **Capabilities**: Fast, production-ready  
+    **Best for**: Quick tasks, production workloads  
+    **Thinking**: Not supported  
+    **Max tokens**: 4096 (configurable via `max_tokens`)
+  </Accordion>
+</AccordionGroup>
+
+### Gemini Models
+
+<AccordionGroup>
+  <Accordion title="gemini-3.1-pro-high">
+    **Provider**: Google  
+    **Capabilities**: Highest quality Gemini  
+    **Best for**: Complex tasks requiring high accuracy  
+    **Thinking**: Supported (Gemini 3+)  
+    **Max tokens**: 16384 (Gemini limit)
+  </Accordion>
+
+  <Accordion title="gemini-3.1-pro-low">
+    **Provider**: Google  
+    **Capabilities**: Cost-optimized Gemini  
+    **Best for**: Budget-conscious tasks  
+    **Thinking**: Supported (Gemini 3+)  
+    **Max tokens**: 16384 (Gemini limit)
+  </Accordion>
+
+  <Accordion title="gemini-3-flash">
+    **Provider**: Google  
+    **Capabilities**: Fastest Gemini model  
+    **Best for**: Low-latency tasks, real-time responses  
+    **Thinking**: Supported (Gemini 3+)  
+    **Max tokens**: 16384 (Gemini limit)
+  </Accordion>
+</AccordionGroup>
+
+## Model Availability
+
+Model availability depends on your configured accounts:
+
+- **Free tier**: Access to all Claude and Gemini models
+- **Pro tier**: Higher quotas and rate limits
+- **Ultra tier**: Highest quotas and priority access
+
+The `/v1/models` endpoint queries the first available account to fetch the model list. If no accounts are available, it returns a `503` error.
+
+## Model Metadata
+
+The proxy dynamically discovers models from the Antigravity Cloud Code API using the `fetchAvailableModels` endpoint. This ensures the model list is always up-to-date with the latest models available to your accounts.
+
+### Model Mapping
+
+You can configure **model aliases** in `config.json` to map model names:
+
+```json
+{
+  "modelMapping": {
+    "claude-3-5-sonnet-20241022": {
+      "mapping": "claude-sonnet-4-5-thinking",
+      "hidden": false
+    }
+  }
+}
+```
+
+This allows you to use legacy model names in your client while the proxy routes to the correct underlying model.
+
+## Error Response
+
+### 503 Service Unavailable
+
+Returned when no accounts are available:
+
+```json
+{
+  "type": "error",
+  "error": {
+    "type": "api_error",
+    "message": "No accounts available"
+  }
+}
+```
+
+### 500 Internal Server Error
+
+Returned when the model list cannot be fetched:
+
+```json
+{
+  "type": "error",
+  "error": {
+    "type": "api_error",
+    "message": "Failed to fetch models: <error details>"
+  }
+}
+```

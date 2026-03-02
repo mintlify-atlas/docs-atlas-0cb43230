@@ -1,0 +1,327 @@
+---
+title: 'POST /v1/messages'
+description: 'Send messages to Claude or Gemini models'
+---
+
+## Endpoint
+
+```
+POST /v1/messages
+```
+
+Send a message to the model and receive a response. Supports both streaming and non-streaming modes.
+
+## Request Body
+
+<ParamField path="model" type="string" required>
+  The model to use for generation. Examples:
+  - `claude-opus-4-6-thinking`
+  - `claude-sonnet-4-5-thinking`
+  - `gemini-3-flash`
+  
+  Use `GET /v1/models` to see all available models.
+</ParamField>
+
+<ParamField path="messages" type="array" required>
+  Array of message objects representing the conversation history. Each message has:
+  
+  - `role` (string): Either `user` or `assistant`
+  - `content` (string | array): Message content as text or array of content blocks
+  
+  ```json
+  [
+    {
+      "role": "user",
+      "content": "What is the capital of France?"
+    }
+  ]
+  ```
+</ParamField>
+
+<ParamField path="max_tokens" type="number" default="4096">
+  Maximum number of tokens to generate in the response.
+  
+  For Gemini models, this is automatically capped at 16384 (Gemini's limit).
+</ParamField>
+
+<ParamField path="stream" type="boolean" default="false">
+  Enable streaming mode. When `true`, the response is sent as Server-Sent Events (SSE).
+</ParamField>
+
+<ParamField path="system" type="string">
+  System instruction to guide the model's behavior.
+  
+  ```json
+  "system": "You are a helpful coding assistant."
+  ```
+</ParamField>
+
+<ParamField path="tools" type="array">
+  Array of tool definitions for function calling. Each tool has:
+  
+  - `name` (string): Tool name
+  - `description` (string): What the tool does
+  - `input_schema` (object): JSON Schema for tool parameters
+  
+  ```json
+  [
+    {
+      "name": "search_files",
+      "description": "Search for files matching a pattern",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "pattern": { "type": "string" }
+        },
+        "required": ["pattern"]
+      }
+    }
+  ]
+  ```
+</ParamField>
+
+<ParamField path="tool_choice" type="object">
+  Control which tool the model should use:
+  
+  - `{"type": "auto"}` - Model decides (default)
+  - `{"type": "any"}` - Model must use a tool
+  - `{"type": "tool", "name": "tool_name"}` - Use specific tool
+</ParamField>
+
+<ParamField path="thinking" type="object">
+  Enable extended thinking for supported models:
+  
+  ```json
+  {
+    "type": "enabled",
+    "budget_tokens": 10000
+  }
+  ```
+</ParamField>
+
+<ParamField path="temperature" type="number" min="0" max="1">
+  Sampling temperature. Higher values make output more random.
+</ParamField>
+
+<ParamField path="top_p" type="number" min="0" max="1">
+  Nucleus sampling threshold.
+</ParamField>
+
+<ParamField path="top_k" type="number">
+  Top-K sampling parameter (Gemini only).
+</ParamField>
+
+## Response
+
+### Non-Streaming Response
+
+<ResponseField name="id" type="string">
+  Unique message identifier.
+</ResponseField>
+
+<ResponseField name="type" type="string">
+  Always `"message"`.
+</ResponseField>
+
+<ResponseField name="role" type="string">
+  Always `"assistant"`.
+</ResponseField>
+
+<ResponseField name="content" type="array">
+  Array of content blocks. Each block can be:
+  
+  - **Text block**: `{"type": "text", "text": "..."}`
+  - **Thinking block**: `{"type": "thinking", "thinking": "...", "signature": "..."}`
+  - **Tool use block**: `{"type": "tool_use", "id": "...", "name": "...", "input": {...}}`
+</ResponseField>
+
+<ResponseField name="model" type="string">
+  The model that generated the response.
+</ResponseField>
+
+<ResponseField name="stop_reason" type="string">
+  Why the model stopped generating:
+  
+  - `"end_turn"` - Natural completion
+  - `"max_tokens"` - Hit token limit
+  - `"tool_use"` - Model called a tool
+  - `"stop_sequence"` - Hit stop sequence
+</ResponseField>
+
+<ResponseField name="usage" type="object">
+  Token usage statistics:
+  
+  - `input_tokens` (number): Tokens in the prompt
+  - `output_tokens` (number): Tokens generated
+  - `cache_creation_input_tokens` (number): Tokens cached (if prompt caching is used)
+  - `cache_read_input_tokens` (number): Tokens read from cache
+</ResponseField>
+
+### Streaming Response
+
+When `stream: true`, the response is sent as Server-Sent Events:
+
+```
+event: message_start
+data: {"type":"message_start","message":{"id":"msg_01...","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-5-thinking"}}
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"The capital"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" of France is"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" Paris."}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0}
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":8}}
+
+event: message_stop
+data: {"type":"message_stop"}
+```
+
+## Examples
+
+### Basic Request
+
+```bash
+curl -X POST http://localhost:8080/v1/messages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-sonnet-4-5-thinking",
+    "max_tokens": 1024,
+    "messages": [
+      {
+        "role": "user",
+        "content": "What is the capital of France?"
+      }
+    ]
+  }'
+```
+
+### Streaming Request
+
+```bash
+curl -X POST http://localhost:8080/v1/messages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gemini-3-flash",
+    "max_tokens": 1024,
+    "stream": true,
+    "messages": [
+      {
+        "role": "user",
+        "content": "Write a haiku about coding"
+      }
+    ]
+  }'
+```
+
+### With Tools
+
+```bash
+curl -X POST http://localhost:8080/v1/messages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "claude-opus-4-6-thinking",
+    "max_tokens": 2048,
+    "messages": [
+      {
+        "role": "user",
+        "content": "Find the package.json file"
+      }
+    ],
+    "tools": [
+      {
+        "name": "search_files",
+        "description": "Search for files matching a pattern",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "pattern": { "type": "string", "description": "Glob pattern" }
+          },
+          "required": ["pattern"]
+        }
+      }
+    ]
+  }'
+```
+
+## Prompt Caching
+
+The proxy automatically handles **prompt caching** to reduce latency and token usage:
+
+- Caching is **organization-scoped** (requires same account + session ID)
+- Session ID is derived from the **SHA256 hash** of the first user message
+- Cached tokens are reported in `usage.cache_read_input_tokens`
+
+### How It Works
+
+1. First request with a conversation → creates cache
+2. Subsequent requests with the same account → reads from cache
+3. If account switches → cache miss, new cache created
+
+To maximize cache hits, use the **sticky** or **hybrid** account selection strategy.
+
+## Error Responses
+
+### 400 Bad Request - Invalid Parameters
+
+```json
+{
+  "type": "error",
+  "error": {
+    "type": "invalid_request_error",
+    "message": "messages is required and must be an array"
+  }
+}
+```
+
+### 401 Unauthorized - Missing API Key
+
+```json
+{
+  "type": "error",
+  "error": {
+    "type": "authentication_error",
+    "message": "Invalid or missing API key"
+  }
+}
+```
+
+### 503 Service Unavailable - All Accounts Exhausted
+
+```json
+{
+  "type": "error",
+  "error": {
+    "type": "api_error",
+    "message": "No accounts available"
+  }
+}
+```
+
+### 400 Bad Request - Quota Exhausted
+
+When all accounts are rate-limited for the requested model:
+
+```json
+{
+  "type": "error",
+  "error": {
+    "type": "invalid_request_error",
+    "message": "RESOURCE_EXHAUSTED: You have exhausted your capacity on claude-opus-4-6-thinking. Quota will reset after 2h15m."
+  }
+}
+```
+
+<Note>
+  The proxy returns **400** (not 429) for quota exhaustion to prevent clients from automatically retrying. This ensures Claude Code stops cleanly instead of entering a retry loop.
+</Note>

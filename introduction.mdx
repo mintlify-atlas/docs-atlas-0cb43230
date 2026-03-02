@@ -1,0 +1,86 @@
+---
+title: Introduction
+description: A proxy server that exposes an Anthropic-compatible API backed by Antigravity's Cloud Code, letting you use Claude and Gemini models with Claude Code CLI.
+---
+
+# Antigravity Claude Proxy
+
+A proxy server that exposes an **Anthropic-compatible API** backed by **Antigravity's Cloud Code**, letting you use Claude and Gemini models with **Claude Code CLI** and **OpenClaw / ClawdBot**.
+
+<Warning>
+**Terms of service warning**
+
+Google has been issuing ToS violation bans on accounts connected to this proxy. Using this proxy may violate Google's Terms of Service. 
+
+**High-risk scenarios:**
+- Fresh Google accounts have a very high chance of getting banned
+- New accounts with Pro/Ultra subscriptions are frequently flagged and banned
+
+**By using this proxy, you acknowledge:**
+- This is an unofficial tool not endorsed by Google
+- Your account may be suspended or permanently banned
+- You assume all risks associated with using this proxy
+
+**Recommendation:** Use an established Google account that you don't rely on for critical services. Avoid creating new accounts specifically for this proxy.
+</Warning>
+
+## How it works
+
+```
+┌──────────────────┐     ┌─────────────────────┐     ┌────────────────────────────┐
+│   Claude Code    │────▶│  This Proxy Server  │────▶│  Antigravity Cloud Code    │
+│   (Anthropic     │     │  (Anthropic → Google│     │  (daily-cloudcode-pa.      │
+│    API format)   │     │   Generative AI)    │     │   sandbox.googleapis.com)  │
+└──────────────────┘     └─────────────────────┘     └────────────────────────────┘
+```
+
+1. Receives requests in **Anthropic Messages API format**
+2. Uses OAuth tokens from added Google accounts (or Antigravity's local database)
+3. Transforms to **Google Generative AI format** with Cloud Code wrapping
+4. Sends to Antigravity's Cloud Code API
+5. Converts responses back to **Anthropic format** with full thinking/streaming support
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Multi-model support" icon="layer-group">
+    Access Claude models (Sonnet, Opus with thinking) and Gemini models (Flash, Pro) through a single API.
+  </Card>
+  
+  <Card title="Intelligent load balancing" icon="scale-balanced">
+    Three strategies for account selection: sticky (cache-optimized), round-robin (load-balanced), and hybrid (smart distribution).
+  </Card>
+  
+  <Card title="Web management console" icon="display">
+    Real-time dashboard with Chart.js visualization, account management, quota monitoring, and live log streaming.
+  </Card>
+  
+  <Card title="Prompt caching support" icon="database">
+    Organization-scoped caching maintains continuity across conversation turns with automatic session ID derivation.
+  </Card>
+  
+  <Card title="Model fallback" icon="arrows-rotate">
+    Automatically switches to alternate models when quota is exhausted, with configurable fallback mappings.
+  </Card>
+  
+  <Card title="Background process management" icon="server">
+    Launch as a detached background service that survives terminal closure, with simple CLI controls.
+  </Card>
+</CardGroup>
+
+## Get started
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get up and running in under 5 minutes with step-by-step instructions.
+  </Card>
+  
+  <Card title="Installation" icon="download" href="/installation">
+    Multiple installation methods including npm, npx, and git clone.
+  </Card>
+</CardGroup>
+
+## Prerequisites
+
+- **Node.js** 18 or later
+- **Antigravity** installed (for single-account mode) OR Google account(s) for multi-account mode

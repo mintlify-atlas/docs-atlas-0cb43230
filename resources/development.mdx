@@ -1,0 +1,296 @@
+---
+title: Development
+description: Developer guide for contributing to Antigravity Claude Proxy
+---
+
+## Quick Start
+
+Get started with development in minutes:
+
+```bash
+git clone https://github.com/badri-s2001/antigravity-claude-proxy.git
+cd antigravity-claude-proxy
+npm install  # Automatically builds CSS via prepare hook
+npm start    # Start server on port 8080
+```
+
+<Note>
+  This project uses a local Tailwind CSS build system. CSS is pre-compiled and included in the repository, so you can run the project immediately after cloning.
+</Note>
+
+## Project Architecture
+
+### Request Flow
+
+```
+Claude Code CLI → Express Server (server.js) → CloudCode Client → Antigravity Cloud Code API
+```
+
+The proxy acts as a translator between:
+1. **Anthropic Messages API format** (input from Claude Code CLI)
+2. **Google Generative AI format** (Cloud Code API)
+3. **Anthropic Messages API format** (output back to CLI)
+
+### Directory Structure
+
+```
+src/
+├── index.js                    # Entry point
+├── server.js                   # Express server with Anthropic-compatible endpoints
+├── constants.js                # Configuration values and model mappings
+├── errors.js                   # Custom error classes
+├── fallback-config.js          # Model fallback mappings
+│
+├── cloudcode/                  # Cloud Code API client
+│   ├── session-manager.js      # Session ID derivation for caching
+│   ├── request-builder.js      # Build API request payloads
+│   ├── sse-streamer.js         # Stream SSE events in real-time
+│   └── model-api.js            # Model listing and quota APIs
+│
+├── account-manager/            # Multi-account pool management
+│   ├── storage.js              # Config file I/O
+│   ├── rate-limits.js          # Rate limit tracking
+│   └── strategies/             # Account selection strategies
+│       ├── sticky-strategy.js  # Cache-optimized
+│       ├── round-robin-strategy.js  # Load-balanced
+│       └── hybrid-strategy.js  # Smart distribution (default)
+│
+├── auth/                       # Authentication
+│   ├── oauth.js                # Google OAuth with PKCE
+│   └── token-extractor.js      # Legacy token extraction
+│
+├── webui/                      # Web Management Interface
+│   └── index.js                # Express router and API endpoints
+│
+├── format/                     # Format conversion (Anthropic ↔ Google)
+│   ├── request-converter.js    # Anthropic → Google
+│   ├── response-converter.js   # Google → Anthropic
+│   └── thinking-utils.js       # Thinking block validation
+│
+└── utils/                      # Utilities
+    ├── logger.js               # Structured logging
+    └── helpers.js              # Common utilities
+```
+
+### Frontend Structure
+
+```
+public/
+├── index.html                  # Main entry point
+├── css/
+│   ├── style.css               # Compiled CSS (generated, don't edit)
+│   └── src/
+│       └── input.css           # Tailwind source (edit this)
+├── js/
+│   ├── app.js                  # Alpine.js application
+│   ├── store.js                # Global state management
+│   ├── components/             # UI Components
+│   │   ├── dashboard.js        # Dashboard with Chart.js
+│   │   ├── account-manager.js  # Account list and OAuth
+│   │   └── logs-viewer.js      # Live log streaming
+│   └── utils/                  # Frontend utilities
+│       ├── error-handler.js    # Centralized error handling
+│       └── account-actions.js  # Account operations service
+└── views/                      # HTML partials
+    ├── dashboard.html
+    ├── accounts.html
+    └── settings.html
+```
+
+## Development Commands
+
+### Backend Development
+
+```bash
+# Watch server files for changes (auto-restart)
+npm run dev
+
+# Start with developer mode (enables debug logging and dev tools)
+npm start -- --dev-mode
+
+# Start with specific account selection strategy
+npm start -- --strategy=sticky      # Cache-optimized
+npm start -- --strategy=round-robin # Load-balanced
+npm start -- --strategy=hybrid      # Smart distribution (default)
+
+# Enable model fallback (falls back to alternate models when quota exhausted)
+npm start -- --fallback
+```
+
+### Frontend Development
+
+<Note>
+  **CSS Workflow:**
+  1. Edit `public/css/src/input.css` (Tailwind source with @apply directives)
+  2. Run build command to compile
+  3. Output: `public/css/style.css` (minified, committed to git)
+</Note>
+
+```bash
+# Build CSS once
+npm run build:css
+
+# Watch CSS files for changes (auto-rebuild)
+npm run watch:css
+
+# Watch both CSS and server (recommended for full-stack dev)
+npm run dev:full
+```
+
+**When to rebuild CSS:**
+- After modifying `public/css/src/input.css`
+- After pulling changes that updated CSS source
+- Automatically runs on `npm install` (via prepare hook)
+
+### Backend-Only Development
+
+If you're only working on backend code:
+
+```bash
+npm install --production  # Skip devDependencies (saves ~20MB)
+npm start
+```
+
+<Note>
+  Pre-compiled CSS is committed to the repository, so you don't need frontend build tools unless modifying styles.
+</Note>
+
+## Key Modules
+
+### Constants (`src/constants.js`)
+
+All configuration values are centralized here:
+- API endpoints and headers
+- Model mappings and families
+- OAuth configuration
+- Rate limit thresholds
+- Fallback model mappings
+
+### Account Manager (`src/account-manager/`)
+
+Manages multi-account pools with:
+- **Three selection strategies**: sticky, round-robin, hybrid
+- **Rate limit tracking**: Per-model rate limits with automatic cooldown
+- **Quota awareness**: Deprioritizes accounts below configurable thresholds
+- **Health scoring**: Tracks success/failure patterns for smart routing
+
+### Format Converters (`src/format/`)
+
+Handles bidirectional conversion:
+- **Request**: Anthropic Messages API → Google Generative AI format
+- **Response**: Google responses → Anthropic streaming/non-streaming format
+- **Thinking blocks**: Validates and recovers thinking signatures across models
+- **Cache control**: Strips unsupported fields before sending to Cloud Code API
+
+### Logger (`src/utils/logger.js`)
+
+Structured logging with colored output:
+```javascript
+logger.info('message')     // Blue
+logger.success('message')  // Green
+logger.warn('message')     // Yellow
+logger.error('message')    // Red
+logger.debug('message')    // Magenta (only when debug enabled)
+```
+
+## Contributing
+
+We welcome contributions! Here's how to get started:
+
+### 1. Fork and Clone
+
+```bash
+git clone https://github.com/YOUR_USERNAME/antigravity-claude-proxy.git
+cd antigravity-claude-proxy
+npm install
+```
+
+### 2. Create a Branch
+
+```bash
+git checkout -b feature/your-feature-name
+```
+
+### 3. Make Changes
+
+- Follow existing code style and conventions
+- Add tests for new functionality
+- Update documentation (README.md, CLAUDE.md, docs) as needed
+- Ensure all tests pass: `npm test`
+
+### 4. Test Your Changes
+
+```bash
+# Start server
+npm start
+
+# In another terminal, run tests
+npm test
+
+# Test specific functionality
+npm run test:signatures
+npm run test:streaming
+```
+
+### 5. Submit a Pull Request
+
+- Write a clear description of your changes
+- Reference any related issues
+- Ensure CI checks pass
+
+## Code Style Guidelines
+
+- Use **CommonJS** (`require`/`module.exports`) for backend code
+- Use **ES6+** features where appropriate (async/await, destructuring, etc.)
+- Follow **existing patterns** for consistency
+- Add **JSDoc comments** for public APIs
+- Use **structured logging** instead of console.log
+- Handle errors with **custom error classes** from `src/errors.js`
+
+## Frontend Development Patterns
+
+### Error Handling
+
+Use `ErrorHandler.withLoading()` for async operations:
+
+```javascript
+async refreshAccount(email) {
+  return await window.ErrorHandler.withLoading(async () => {
+    const response = await fetch(`/api/accounts/${email}/refresh`);
+    if (!response.ok) throw new Error('Refresh failed');
+    return await response.json();
+  }, this, 'loading', { errorMessage: 'Failed to refresh account' });
+}
+```
+
+### Service Layer
+
+Use `AccountActions` for account operations:
+
+```javascript
+// ✅ Good: Use service layer
+const result = await window.AccountActions.refreshAccount(email);
+if (result.success) {
+  this.$store.global.showToast('Success', 'success');
+}
+
+// ❌ Bad: Direct API call
+const response = await fetch(`/api/accounts/${email}/refresh`);
+```
+
+## Architecture Documentation
+
+For detailed architecture information, see:
+- **[CLAUDE.md](https://github.com/badri-s2001/antigravity-claude-proxy/blob/main/CLAUDE.md)**: Complete technical documentation
+- **[README.md](https://github.com/badri-s2001/antigravity-claude-proxy/blob/main/README.md)**: User-facing documentation
+
+When making significant changes, update both files to keep documentation in sync.
+
+## Getting Help
+
+If you need help or have questions:
+- Open an issue on [GitHub](https://github.com/badri-s2001/antigravity-claude-proxy/issues)
+- Check existing issues for similar problems
+- Review the documentation and source code
+
+We appreciate your contributions to making this project better!

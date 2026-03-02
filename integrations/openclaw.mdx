@@ -1,0 +1,267 @@
+---
+title: "OpenClaw Integration"
+description: "Connect OpenClaw/ClawdBot to Antigravity Claude Proxy for AI messaging"
+icon: "robot"
+---
+
+## What is OpenClaw?
+
+[OpenClaw](https://docs.openclaw.ai/) (formerly ClawdBot/Moltbot) is an AI agent gateway that connects to messaging apps like Telegram, WhatsApp, Discord, Slack, and iMessage. You can configure it to use this proxy for Claude and Gemini models.
+
+## Prerequisites
+
+Before you begin, ensure you have:
+
+- OpenClaw installed globally
+- Antigravity Claude Proxy running on port 8080
+- At least one Google account linked to the proxy
+
+<Steps>
+  <Step title="Install OpenClaw">
+    Install OpenClaw globally using npm:
+    
+    ```bash
+    npm install -g openclaw@latest
+    ```
+  </Step>
+
+  <Step title="Start the Proxy">
+    Make sure Antigravity Claude Proxy is running:
+    
+    ```bash
+    antigravity-claude-proxy start
+    ```
+    
+    The proxy should be running on `http://127.0.0.1:8080` by default.
+  </Step>
+
+  <Step title="Configure OpenClaw">
+    Edit your OpenClaw configuration file:
+    
+    <CodeGroup>
+      ```bash macOS/Linux
+      ~/.openclaw/openclaw.json
+      ```
+      
+      ```bash Windows
+      %USERPROFILE%\.openclaw\openclaw.json
+      ```
+    </CodeGroup>
+    
+    Add the following configuration:
+    
+    ```json
+    {
+      "models": {
+        "mode": "merge",
+        "providers": {
+          "antigravity-proxy": {
+            "baseUrl": "http://127.0.0.1:8080",
+            "apiKey": "test",
+            "api": "anthropic-messages",
+            "models": [
+              {
+                "id": "gemini-3-flash",
+                "name": "Gemini 3 Flash",
+                "reasoning": true,
+                "input": ["text", "image"],
+                "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+                "contextWindow": 1048576,
+                "maxTokens": 65536
+              },
+              {
+                "id": "gemini-3.1-pro-high",
+                "name": "Gemini 3.1 Pro High",
+                "reasoning": true,
+                "input": ["text", "image"],
+                "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+                "contextWindow": 1048576,
+                "maxTokens": 65536
+              },
+              {
+                "id": "claude-sonnet-4-5",
+                "name": "Claude Sonnet 4.5",
+                "reasoning": false,
+                "input": ["text", "image"],
+                "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+                "contextWindow": 200000,
+                "maxTokens": 16384
+              },
+              {
+                "id": "claude-sonnet-4-5-thinking",
+                "name": "Claude Sonnet 4.5 Thinking",
+                "reasoning": true,
+                "input": ["text", "image"],
+                "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+                "contextWindow": 200000,
+                "maxTokens": 16384
+              },
+              {
+                "id": "claude-opus-4-6-thinking",
+                "name": "Claude Opus 4.6 Thinking",
+                "reasoning": true,
+                "input": ["text", "image"],
+                "cost": { "input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0 },
+                "contextWindow": 200000,
+                "maxTokens": 32000
+              }
+            ]
+          }
+        }
+      },
+      "agents": {
+        "defaults": {
+          "model": {
+            "primary": "antigravity-proxy/gemini-3-flash",
+            "fallbacks": ["antigravity-proxy/gemini-3.1-pro-high"]
+          },
+          "models": {
+            "antigravity-proxy/gemini-3-flash": {}
+          }
+        }
+      }
+    }
+    ```
+    
+    <Warning>
+      Use `127.0.0.1` instead of `localhost` in the `baseUrl`. This ensures the connection stays on the loopback interface and avoids potential DNS resolution issues.
+    </Warning>
+  </Step>
+
+  <Step title="Start OpenClaw Gateway">
+    In a new terminal, start the OpenClaw gateway:
+    
+    ```bash
+    openclaw gateway
+    ```
+    
+    OpenClaw will now use the proxy models you configured.
+  </Step>
+
+  <Step title="Verify Configuration">
+    Check that the models are available:
+    
+    ```bash
+    # List all available models
+    openclaw models list
+    
+    # Check gateway status
+    openclaw status
+    ```
+    
+    You should see models prefixed with `antigravity-proxy/` in the list.
+  </Step>
+</Steps>
+
+## Model Selection
+
+### Switch Default Model
+
+To change the default model for all conversations:
+
+```bash
+openclaw models set antigravity-proxy/claude-opus-4-6-thinking
+```
+
+Or edit the `model.primary` field in your `openclaw.json` config file.
+
+### Available Models
+
+All models configured in the proxy are available with the `antigravity-proxy/` prefix:
+
+- `antigravity-proxy/gemini-3-flash` - Fast Gemini model with reasoning
+- `antigravity-proxy/gemini-3.1-pro-high` - High-quality Gemini model
+- `antigravity-proxy/claude-sonnet-4-5` - Claude Sonnet without reasoning
+- `antigravity-proxy/claude-sonnet-4-5-thinking` - Claude Sonnet with reasoning
+- `antigravity-proxy/claude-opus-4-6-thinking` - Claude Opus with reasoning
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Connection Refused">
+    Make sure the proxy is running before starting OpenClaw:
+    
+    ```bash
+    curl http://127.0.0.1:8080/health
+    ```
+    
+    If this fails, start the proxy:
+    
+    ```bash
+    antigravity-claude-proxy start
+    ```
+  </Accordion>
+
+  <Accordion title="Models Not Showing">
+    If models aren't appearing in OpenClaw:
+    
+    1. Verify the config file is valid JSON (no trailing commas, proper quotes)
+    2. Check that `mode` is set to `"merge"` (not `"replace"` unless you want to override all built-in models)
+    3. Restart the OpenClaw gateway after config changes:
+    
+    ```bash
+    # Stop gateway (Ctrl+C if running in foreground)
+    # Then restart
+    openclaw gateway
+    ```
+  </Accordion>
+
+  <Accordion title="VPS Security Warning">
+    If running on a VPS, ensure the proxy only binds to localhost:
+    
+    ```bash
+    # Default binds to 0.0.0.0 (all interfaces) - exposed to network!
+    antigravity-claude-proxy start
+    
+    # Explicitly bind to localhost only (recommended for VPS)
+    HOST=127.0.0.1 antigravity-claude-proxy start
+    ```
+    
+    <Warning>
+      By default, the proxy binds to `0.0.0.0` which exposes it to all network interfaces. On a VPS, always use `HOST=127.0.0.1` to restrict access to localhost only, or ensure you have proper authentication (`API_KEY` env var) and firewall rules in place.
+    </Warning>
+  </Accordion>
+</AccordionGroup>
+
+## Configuration Reference
+
+### Configuration Mode
+
+The `mode` field in the models configuration determines how OpenClaw handles custom models:
+
+- `"merge"` - Adds proxy models alongside built-in OpenClaw models
+- `"replace"` - Replaces all built-in models with only your custom configuration
+
+### Model Properties
+
+Each model in the configuration supports these properties:
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `id` | string | Model identifier used in API calls |
+| `name` | string | Display name shown in OpenClaw |
+| `reasoning` | boolean | Whether the model supports reasoning/thinking |
+| `input` | array | Supported input types (`"text"`, `"image"`) |
+| `cost` | object | Token costs (all `0` for proxy models) |
+| `contextWindow` | number | Maximum context window size |
+| `maxTokens` | number | Maximum output tokens |
+
+## Further Reading
+
+<CardGroup cols={2}>
+  <Card title="OpenClaw Documentation" icon="book" href="https://docs.openclaw.ai/">
+    Official OpenClaw documentation
+  </Card>
+  
+  <Card title="OpenClaw Configuration" icon="gear" href="https://docs.openclaw.ai/gateway/configuration">
+    Configuration reference
+  </Card>
+  
+  <Card title="Load Balancing" icon="scale-balanced" href="/guides/load-balancing">
+    Proxy load balancing strategies
+  </Card>
+  
+  <Card title="Proxy Configuration" icon="sliders" href="/configuration/advanced-config">
+    Advanced proxy settings
+  </Card>
+</CardGroup>

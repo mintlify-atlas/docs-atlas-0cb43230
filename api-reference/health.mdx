@@ -1,0 +1,276 @@
+---
+title: 'Health & Monitoring'
+description: 'Check server health and account status'
+---
+
+## GET /health
+
+Detailed health check endpoint with account status and model quotas.
+
+### Request
+
+```bash
+curl http://localhost:8080/health
+```
+
+### Response
+
+<ResponseField name="status" type="string">
+  Overall server status. Always `"ok"` if the server is running.
+</ResponseField>
+
+<ResponseField name="timestamp" type="string">
+  ISO 8601 timestamp of the health check.
+</ResponseField>
+
+<ResponseField name="latencyMs" type="number">
+  Time taken to generate the health report (in milliseconds).
+</ResponseField>
+
+<ResponseField name="summary" type="string">
+  Human-readable summary of account pool status.
+  
+  Example: `"3 accounts: 2 available, 1 rate-limited"`
+</ResponseField>
+
+<ResponseField name="counts" type="object">
+  Account pool statistics:
+  
+  - `total` (number): Total accounts configured
+  - `available` (number): Accounts ready to use
+  - `rateLimited` (number): Accounts waiting for quota reset
+  - `invalid` (number): Accounts requiring re-authentication
+</ResponseField>
+
+<ResponseField name="accounts" type="array">
+  Detailed status for each account:
+  
+  - `email` (string): Account email address
+  - `status` (string): `"ok"`, `"rate-limited"`, `"invalid"`, or `"banned"`
+  - `lastUsed` (string | null): ISO 8601 timestamp of last use
+  - `modelRateLimits` (object): Per-model rate limit state
+  - `rateLimitCooldownRemaining` (number): Milliseconds until next retry
+  - `models` (object): Per-model quota information (see below)
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "status": "ok",
+  "timestamp": "2026-03-02T10:30:00.000Z",
+  "latencyMs": 245,
+  "summary": "3 accounts: 2 available, 1 rate-limited",
+  "counts": {
+    "total": 3,
+    "available": 2,
+    "rateLimited": 1,
+    "invalid": 0
+  },
+  "accounts": [
+    {
+      "email": "user1@gmail.com",
+      "lastUsed": "2026-03-02T10:25:00.000Z",
+      "modelRateLimits": {},
+      "rateLimitCooldownRemaining": 0,
+      "status": "ok",
+      "models": {
+        "claude-opus-4-6-thinking": {
+          "remaining": "75%",
+          "remainingFraction": 0.75,
+          "resetTime": "2026-03-02T11:00:00.000Z"
+        },
+        "gemini-3-flash": {
+          "remaining": "100%",
+          "remainingFraction": 1.0,
+          "resetTime": "2026-03-02T11:00:00.000Z"
+        }
+      }
+    },
+    {
+      "email": "user2@gmail.com",
+      "lastUsed": "2026-03-02T09:15:00.000Z",
+      "modelRateLimits": {
+        "claude-sonnet-4-5-thinking": {
+          "isRateLimited": true,
+          "resetTime": 1709463600000
+        }
+      },
+      "rateLimitCooldownRemaining": 120000,
+      "status": "rate-limited",
+      "models": {
+        "claude-sonnet-4-5-thinking": {
+          "remaining": "0%",
+          "remainingFraction": 0,
+          "resetTime": "2026-03-02T10:50:00.000Z"
+        }
+      }
+    }
+  ]
+}
+```
+
+### Model Quota Information
+
+Each account's `models` object contains quota details per model:
+
+- **remaining** (string): Human-readable percentage (e.g., `"75%"`)
+- **remainingFraction** (number): Quota fraction from 0 to 1
+  - `1.0` = Full quota available
+  - `0.0` = Quota exhausted
+  - `null` = Quota unavailable (error fetching)
+- **resetTime** (string | null): ISO 8601 timestamp when quota resets
+
+---
+
+## GET /account-limits
+
+Fetch quota and subscription data for all accounts across all models.
+
+### Request
+
+```bash
+curl http://localhost:8080/account-limits
+```
+
+### Query Parameters
+
+<ParamField path="format" type="string" default="json">
+  Response format:
+  
+  - `json` - JSON response (default)
+  - `table` - ASCII table for terminal display
+</ParamField>
+
+<ParamField path="includeHistory" type="boolean" default="false">
+  Include 30-day usage history in the response. Used by the Web UI dashboard.
+</ParamField>
+
+### Response (JSON)
+
+<ResponseField name="timestamp" type="string">
+  Human-readable timestamp of the report.
+</ResponseField>
+
+<ResponseField name="totalAccounts" type="number">
+  Total number of accounts configured.
+</ResponseField>
+
+<ResponseField name="models" type="array">
+  List of all model IDs across all accounts.
+</ResponseField>
+
+<ResponseField name="globalQuotaThreshold" type="number">
+  Server-wide quota threshold (0-0.99). Accounts below this threshold are deprioritized.
+</ResponseField>
+
+<ResponseField name="accounts" type="array">
+  Detailed account information:
+  
+  - `email` (string): Account email
+  - `status` (string): `"ok"`, `"rate-limited"`, `"invalid"`, or `"banned"`
+  - `subscription` (object): Subscription tier data
+    - `tier` (string): `"free"`, `"pro"`, or `"ultra"`
+    - `projectId` (string): Google Cloud project ID
+    - `detectedAt` (number): Timestamp when tier was detected
+  - `limits` (object): Per-model quota limits
+  - `quotaThreshold` (number | undefined): Per-account quota threshold (overrides global)
+  - `modelQuotaThresholds` (object): Per-model quota thresholds
+</ResponseField>
+
+### Example Response
+
+```json
+{
+  "timestamp": "3/2/2026, 10:30:00 AM",
+  "totalAccounts": 2,
+  "models": [
+    "claude-opus-4-6-thinking",
+    "claude-sonnet-4-5-thinking",
+    "gemini-3-flash",
+    "gemini-3.1-pro-high"
+  ],
+  "globalQuotaThreshold": 0.1,
+  "accounts": [
+    {
+      "email": "user@gmail.com",
+      "status": "ok",
+      "subscription": {
+        "tier": "pro",
+        "projectId": "rising-fact-p41fc",
+        "detectedAt": 1709371200000
+      },
+      "quotaThreshold": 0.2,
+      "modelQuotaThresholds": {
+        "claude-opus-4-6-thinking": 0.15
+      },
+      "limits": {
+        "claude-opus-4-6-thinking": {
+          "remaining": "75%",
+          "remainingFraction": 0.75,
+          "resetTime": "2026-03-02T11:00:00.000Z"
+        },
+        "gemini-3-flash": {
+          "remaining": "100%",
+          "remainingFraction": 1.0,
+          "resetTime": null
+        }
+      }
+    }
+  ]
+}
+```
+
+### Response (ASCII Table)
+
+When `?format=table` is used:
+
+```
+Account Limits (3/2/2026, 10:30:00 AM)
+Accounts: 3 total, 2 available, 1 rate-limited, 0 invalid
+
+Account                  Status          Last Used                Quota Reset              
+────────────────────────────────────────────────────────────────────────────────────────────
+user1                    ok              3/2/2026, 10:25:00 AM    3/2/2026, 11:00:00 AM
+user2                    (1/4) limited   3/2/2026, 9:15:00 AM     3/2/2026, 10:50:00 AM
+user3                    error           never                    -
+  └─ UNAUTHENTICATED: Token expired
+
+Model                           user1                         user2                         
+────────────────────────────────────────────────────────────────────────────────────────────
+claude-opus-4-6-thinking        75%                           100%                          
+claude-sonnet-4-5-thinking      80%                           0% (wait 20m)                 
+gemini-3-flash                  100%                          100%                          
+```
+
+---
+
+## Monitoring Best Practices
+
+### Health Check Frequency
+
+- **Production**: Poll `/health` every 30-60 seconds
+- **Development**: Use the Web UI for real-time monitoring
+
+### Account Limits Polling
+
+- **Web UI**: Polls `/account-limits?includeHistory=true` every ~30s (with jitter)
+- **CLI Monitoring**: Use `?format=table` for terminal-friendly output
+
+### Alerting
+
+Set up alerts based on:
+
+1. **No available accounts**: `counts.available === 0`
+2. **High invalid account ratio**: `counts.invalid / counts.total > 0.3`
+3. **Quota exhaustion**: All accounts have `remainingFraction < 0.1` for a model
+
+### Quota Thresholds
+
+The proxy supports **three-tier quota protection**:
+
+1. **Global threshold**: Configured via `globalQuotaThreshold` in `config.json` (0-0.99)
+2. **Per-account threshold**: Overrides global for specific accounts
+3. **Per-model threshold**: Highest priority, overrides both global and account-level
+
+Accounts below their threshold are deprioritized by the hybrid selection strategy.

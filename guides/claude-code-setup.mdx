@@ -1,0 +1,414 @@
+---
+title: Claude Code Setup
+description: Configure Claude Code CLI to use the Antigravity Claude Proxy
+icon: terminal
+---
+
+This guide shows you how to configure the Claude Code CLI to route requests through the Antigravity Claude Proxy instead of using official Anthropic credits.
+
+## Prerequisites
+
+<Steps>
+  <Step title="Install Claude Code CLI">
+    Follow the official installation instructions at [claude.ai/code](https://claude.ai/code)
+  </Step>
+  
+  <Step title="Start the proxy server">
+    ```bash
+    acc start
+    # or: antigravity-claude-proxy start
+    ```
+    
+    Verify it's running:
+    ```bash
+    curl http://localhost:8080/health
+    ```
+  </Step>
+  
+  <Step title="Add at least one Google account">
+    See the [Account Management](/guides/account-management) guide for details:
+    ```bash
+    antigravity-claude-proxy accounts add
+    ```
+  </Step>
+</Steps>
+
+## Configuration Methods
+
+You can configure Claude Code in two ways:
+
+<Tabs>
+  <Tab title="Web Console (Recommended)">
+    The easiest way to configure Claude Code:
+    
+    <Steps>
+      <Step title="Open the web console">
+        ```bash
+        acc ui
+        # or navigate to: http://localhost:8080
+        ```
+      </Step>
+      
+      <Step title="Configure Claude CLI settings">
+        1. Go to **Settings** → **Claude CLI**
+        2. Toggle **Connection Mode**:
+           - **Proxy Mode**: Uses local proxy server (Antigravity Cloud Code)
+           - **Paid Mode**: Uses official Anthropic Credits
+        3. Select your preferred models
+        4. Click **Apply to Claude CLI**
+      </Step>
+    </Steps>
+    
+    <Warning>
+    **Configuration Precedence**
+    
+    System environment variables (set in shell profile like `.zshrc`) take precedence over `settings.json`. If using the Web Console, ensure you haven't manually exported conflicting variables.
+    </Warning>
+  </Tab>
+  
+  <Tab title="Manual Configuration">
+    Edit the Claude Code settings file directly:
+    
+    <Tabs>
+      <Tab title="macOS">
+        Create or edit `~/.claude/settings.json`
+      </Tab>
+      <Tab title="Linux">
+        Create or edit `~/.claude/settings.json`
+      </Tab>
+      <Tab title="Windows">
+        Create or edit `%USERPROFILE%\.claude\settings.json`
+      </Tab>
+    </Tabs>
+  </Tab>
+</Tabs>
+
+## Settings.json Configuration
+
+### Using Claude Models
+
+Add this configuration to `settings.json`:
+
+```json
+{
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "test",
+    "ANTHROPIC_BASE_URL": "http://localhost:8080",
+    "ANTHROPIC_MODEL": "claude-opus-4-6-thinking",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-6-thinking",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-5-thinking",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-sonnet-4-5",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-sonnet-4-5-thinking",
+    "ENABLE_EXPERIMENTAL_MCP_CLI": "true"
+  }
+}
+```
+
+<AccordionGroup>
+  <Accordion title="Field Descriptions">
+    - **ANTHROPIC_AUTH_TOKEN**: Set to `"test"` (any value works, proxy doesn't validate)
+    - **ANTHROPIC_BASE_URL**: Proxy server address (default: `http://localhost:8080`)
+    - **ANTHROPIC_MODEL**: Primary model for requests
+    - **ANTHROPIC_DEFAULT_OPUS_MODEL**: Model used when you specify "opus"
+    - **ANTHROPIC_DEFAULT_SONNET_MODEL**: Model used when you specify "sonnet"
+    - **ANTHROPIC_DEFAULT_HAIKU_MODEL**: Model used when you specify "haiku"
+    - **CLAUDE_CODE_SUBAGENT_MODEL**: Model for sub-agents (use faster model)
+    - **ENABLE_EXPERIMENTAL_MCP_CLI**: Enable MCP (Model Context Protocol) support
+  </Accordion>
+</AccordionGroup>
+
+### Using Gemini Models
+
+To use Google Gemini models instead of Claude:
+
+```json
+{
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "test",
+    "ANTHROPIC_BASE_URL": "http://localhost:8080",
+    "ANTHROPIC_MODEL": "gemini-3.1-pro-high[1m]",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "gemini-3.1-pro-high[1m]",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "gemini-3-flash[1m]",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "gemini-3-flash[1m]",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "gemini-3-flash[1m]",
+    "ENABLE_EXPERIMENTAL_MCP_CLI": "true"
+  }
+}
+```
+
+<Info>
+See the [Available Models](/configuration/models) documentation for a complete list of supported models and their capabilities.
+</Info>
+
+## Environment Variables
+
+Alternatively, set environment variables in your shell profile:
+
+<Tabs>
+  <Tab title="macOS (Zsh)">
+    Add to `~/.zshrc`:
+    ```bash
+    export ANTHROPIC_BASE_URL="http://localhost:8080"
+    export ANTHROPIC_AUTH_TOKEN="test"
+    export ANTHROPIC_MODEL="claude-opus-4-6-thinking"
+    ```
+    
+    Reload your shell:
+    ```bash
+    source ~/.zshrc
+    ```
+  </Tab>
+  
+  <Tab title="macOS/Linux (Bash)">
+    Add to `~/.bashrc`:
+    ```bash
+    export ANTHROPIC_BASE_URL="http://localhost:8080"
+    export ANTHROPIC_AUTH_TOKEN="test"
+    export ANTHROPIC_MODEL="claude-opus-4-6-thinking"
+    ```
+    
+    Reload your shell:
+    ```bash
+    source ~/.bashrc
+    ```
+  </Tab>
+  
+  <Tab title="Windows (PowerShell)">
+    Add to PowerShell profile:
+    ```powershell
+    Add-Content $PROFILE "`n`$env:ANTHROPIC_BASE_URL = 'http://localhost:8080'"
+    Add-Content $PROFILE "`$env:ANTHROPIC_AUTH_TOKEN = 'test'"
+    Add-Content $PROFILE "`$env:ANTHROPIC_MODEL = 'claude-opus-4-6-thinking'"
+    ```
+    
+    Reload profile:
+    ```powershell
+    . $PROFILE
+    ```
+  </Tab>
+  
+  <Tab title="Windows (CMD)">
+    Set persistent environment variables:
+    ```cmd
+    setx ANTHROPIC_BASE_URL "http://localhost:8080"
+    setx ANTHROPIC_AUTH_TOKEN "test"
+    setx ANTHROPIC_MODEL "claude-opus-4-6-thinking"
+    ```
+    
+    <Warning>Restart your terminal for changes to take effect</Warning>
+  </Tab>
+</Tabs>
+
+## Proxy Mode vs Paid Mode
+
+The web console allows you to toggle between two modes:
+
+| Feature | Proxy Mode | Paid Mode |
+|---------|------------|----------|
+| **Backend** | Local proxy server (Antigravity) | Official Anthropic API |
+| **Cost** | Free (uses Google Cloud quotas) | Paid (requires Anthropic credits) |
+| **Models** | Claude + Gemini | Claude only |
+| **Configuration** | Sets proxy URL in settings.json | Clears proxy settings |
+
+<Tip>
+**Paid Mode** automatically removes proxy settings from `settings.json` so you can use your official Anthropic account without conflicts.
+</Tip>
+
+## Verification Steps
+
+Confirm Claude Code is using the proxy:
+
+<Steps>
+  <Step title="Check proxy is running">
+    ```bash
+    acc status
+    ```
+    
+    Should show: `Proxy is running (PID: xxxx)`
+  </Step>
+  
+  <Step title="Run Claude Code">
+    ```bash
+    claude
+    ```
+    
+    If prompted to select a login method, add this to `~/.claude.json` (macOS/Linux) or `%USERPROFILE%\.claude.json` (Windows):
+    ```json
+    {
+      "hasCompletedOnboarding": true
+    }
+    ```
+    
+    Then restart your terminal.
+  </Step>
+  
+  <Step title="Test a request">
+    Send a simple prompt to Claude:
+    ```
+    > What is 2+2?
+    ```
+    
+    Check proxy logs:
+    ```bash
+    acc start --log
+    ```
+    
+    You should see request logs showing which account and model were used.
+  </Step>
+</Steps>
+
+## Advanced Configurations
+
+### Multiple Claude Code Instances
+
+Run both official Claude Code and Antigravity version simultaneously:
+
+<Tabs>
+  <Tab title="macOS/Linux">
+    Add alias to `~/.zshrc` or `~/.bashrc`:
+    ```bash
+    alias claude-antigravity='CLAUDE_CONFIG_DIR=~/.claude-account-antigravity ANTHROPIC_BASE_URL="http://localhost:8080" ANTHROPIC_AUTH_TOKEN="test" command claude'
+    ```
+    
+    Usage:
+    ```bash
+    claude           # Official API with your credits
+    claude-antigravity  # Proxy server with free quota
+    ```
+  </Tab>
+  
+  <Tab title="Windows (PowerShell)">
+    Add to PowerShell `$PROFILE`:
+    ```powershell
+    function claude-antigravity {
+        $env:CLAUDE_CONFIG_DIR = "$env:USERPROFILE\.claude-account-antigravity"
+        $env:ANTHROPIC_BASE_URL = "http://localhost:8080"
+        $env:ANTHROPIC_AUTH_TOKEN = "test"
+        claude
+    }
+    ```
+    
+    Usage:
+    ```powershell
+    claude           # Official API
+    claude-antigravity  # Proxy server
+    ```
+  </Tab>
+</Tabs>
+
+### Custom Proxy Port
+
+If you're running the proxy on a different port:
+
+```bash
+# Start proxy on custom port
+PORT=3001 acc start
+```
+
+Update `settings.json`:
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://localhost:3001"
+  }
+}
+```
+
+### Running as systemd Service
+
+When running the proxy as a systemd service, set `CLAUDE_CONFIG_PATH` to point to the real user's `.claude` directory:
+
+```ini
+# /etc/systemd/system/antigravity-proxy.service
+[Service]
+Environment=CLAUDE_CONFIG_PATH=/home/youruser/.claude
+ExecStart=/usr/bin/node /path/to/antigravity-claude-proxy/src/index.js
+```
+
+Without this, the WebUI's Claude CLI tab won't be able to read or write your Claude Code configuration.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Claude Code still using official API">
+    Check configuration precedence:
+    
+    1. Verify environment variables aren't overriding `settings.json`:
+       ```bash
+       echo $ANTHROPIC_BASE_URL
+       ```
+    2. If set, unset them:
+       ```bash
+       unset ANTHROPIC_BASE_URL
+       unset ANTHROPIC_AUTH_TOKEN
+       ```
+    3. Restart your terminal
+  </Accordion>
+  
+  <Accordion title="Connection refused error">
+    Ensure the proxy server is running:
+    ```bash
+    acc status
+    # If not running:
+    acc start
+    ```
+    
+    Check the port matches your configuration:
+    ```bash
+    curl http://localhost:8080/health
+    ```
+  </Accordion>
+  
+  <Accordion title="Invalid authentication token">
+    The proxy doesn't validate tokens. If you see this error, Claude Code may be trying to use the official API instead of the proxy.
+    
+    Verify `ANTHROPIC_BASE_URL` is set correctly:
+    ```json
+    {
+      "env": {
+        "ANTHROPIC_BASE_URL": "http://localhost:8080"
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Web Console can't modify settings.json">
+    Check file permissions:
+    ```bash
+    ls -la ~/.claude/settings.json
+    ```
+    
+    If running as a systemd service, set `CLAUDE_CONFIG_PATH`:
+    ```bash
+    export CLAUDE_CONFIG_PATH=/home/youruser/.claude
+    ```
+  </Accordion>
+  
+  <Accordion title="Claude Code asks to select login method">
+    Bypass onboarding by adding to `~/.claude.json`:
+    ```json
+    {
+      "hasCompletedOnboarding": true
+    }
+    ```
+    
+    Restart your terminal after making this change.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Load Balancing" icon="scale-balanced" href="/guides/load-balancing">
+    Configure multi-account strategies for optimal performance
+  </Card>
+  <Card title="Available Models" icon="brain" href="/configuration/models">
+    Explore supported Claude and Gemini models
+  </Card>
+  <Card title="Web Console" icon="browser" href="/guides/web-console">
+    Monitor usage and manage accounts visually
+  </Card>
+  <Card title="Account Management" icon="users" href="/guides/account-management">
+    Add and configure Google accounts
+  </Card>
+</CardGroup>

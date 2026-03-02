@@ -1,0 +1,540 @@
+---
+title: Web Console
+description: Monitor and manage the Antigravity Claude Proxy through the web dashboard
+icon: browser
+---
+
+The proxy includes a modern web interface for real-time monitoring, configuration, and account management. Access the console at `http://localhost:8080` when the server is running.
+
+## Accessing the Console
+
+There are two ways to open the web dashboard:
+
+<CodeGroup>
+```bash Quick Launch
+acc ui
+```
+
+```bash Manual
+# 1. Start the proxy
+acc start
+
+# 2. Open browser to:
+http://localhost:8080
+```
+</CodeGroup>
+
+<Tip>
+If running on a custom port, replace `8080` with your configured port:
+```bash
+PORT=3001 acc start
+# Then navigate to: http://localhost:3001
+```
+</Tip>
+
+## Dashboard Overview
+
+The main dashboard provides real-time insights into proxy usage:
+
+### Key Metrics
+
+<CardGroup cols={3}>
+  <Card title="Active Accounts" icon="circle-check">
+    Number of accounts currently available (not rate-limited or disabled)
+  </Card>
+  <Card title="Limited Accounts" icon="clock">
+    Accounts temporarily rate-limited with reset countdowns
+  </Card>
+  <Card title="Total Accounts" icon="users">
+    All configured accounts regardless of status
+  </Card>
+</CardGroup>
+
+### Visualizations
+
+<Tabs>
+  <Tab title="Quota Distribution">
+    **Pie Chart**: Shows quota usage across all models
+    
+    - Color-coded by model family (Claude vs Gemini)
+    - Hover for exact percentages
+    - Click legend to filter models
+    - Auto-updates every 30 seconds (with jitter)
+  </Tab>
+  
+  <Tab title="Usage Trends">
+    **Line Chart**: Request volume over time
+    
+    **Time Ranges:**
+    - 1H - Last hour (minute granularity)
+    - 6H - Last 6 hours
+    - 24H - Last 24 hours
+    - 7D - Last 7 days
+    - All - 30-day history
+    
+    **Display Modes:**
+    - Family - Aggregate by model family (Claude/Gemini)
+    - Model - Individual model breakdown
+    
+    **Smart Analysis:**
+    - Auto-select top 5 most used models
+    - Persist preferences in localStorage
+    - Export data as JSON
+  </Tab>
+  
+  <Tab title="Subscription Distribution">
+    **Donut Chart**: Account tier breakdown
+    
+    - Ultra (Purple badge) - Highest quotas
+    - Pro (Blue badge) - Standard quotas
+    - Free (Gray badge) - Basic quotas
+    
+    Automatically detected from Cloud Code API.
+  </Tab>
+</Tabs>
+
+## Accounts Tab
+
+Manage all your Google accounts from one interface:
+
+### Account Cards
+
+Each account displays:
+
+- **Email address** (with screenshot mode redaction)
+- **Subscription tier badge** (Ultra/Pro/Free)
+- **Last used timestamp**
+- **Enable/disable toggle**
+- **Quota progress bars** for each model:
+  - Color-coded by usage level (green → yellow → red)
+  - Shows percentage remaining and reset time
+  - Draggable threshold markers for quota protection
+- **Rate limit status** (if active, with countdown)
+- **Actions menu**:
+  - Refresh tokens and quota
+  - Configure quota thresholds
+  - Fix invalid accounts (re-auth)
+  - Delete account
+
+### Adding Accounts
+
+<Steps>
+  <Step title="Click Add Account">
+    Opens OAuth flow in a popup window
+  </Step>
+  
+  <Step title="Sign in with Google">
+    Complete the authorization flow
+  </Step>
+  
+  <Step title="Account appears in list">
+    With subscription tier, quota data, and status
+  </Step>
+</Steps>
+
+<Accordion title="Manual Authorization Mode (Headless Servers)">
+  If running on a remote server without desktop:
+  
+  1. Click **Add Account**
+  2. Copy the OAuth URL from the dialog
+  3. Open URL on your local machine
+  4. Complete Google sign-in
+  5. Copy the callback URL or authorization code
+  6. Paste back into the dialog
+  7. Click **Submit**
+</Accordion>
+
+### Quota Protection Settings
+
+Set minimum quota thresholds to switch accounts before quota runs out:
+
+**Per-Account Threshold:**
+1. Click settings icon on account card
+2. Set "Quota Threshold" slider (0-99%)
+3. Click **Save**
+
+**Per-Model Threshold:**
+1. Switch to **Models** tab
+2. Drag the threshold marker on quota bars
+3. Marker color indicates threshold level
+4. Overlap detection prevents conflicts
+
+See [Load Balancing → Quota Protection](/guides/load-balancing#quota-protection) for details.
+
+## Models Tab
+
+View all available models with quota visualization:
+
+### Model Cards
+
+Each model shows:
+
+- **Model ID and family** (Claude/Gemini)
+- **Quota bars per account**:
+  - Stacked horizontal bars
+  - Color-coded by usage level
+  - Draggable per-account threshold markers
+  - Percentage and reset time on hover
+- **Aggregate quota** across all accounts
+- **Model capabilities** (thinking mode, context window)
+
+### Interactive Thresholds
+
+Drag markers on quota bars to set per-model, per-account thresholds:
+
+- **Green marker**: 0-20% threshold
+- **Yellow marker**: 21-50% threshold
+- **Red marker**: 51-99% threshold
+- **Overlap detection**: Warns when markers conflict
+- **Automatic save**: Changes persist immediately
+
+<Tip>
+Use higher thresholds for expensive models (Opus) and lower thresholds for cheap models (Flash) to optimize quota usage.
+</Tip>
+
+## Settings Tab
+
+Configure both proxy server and Claude CLI:
+
+### Server Configuration
+
+<AccordionGroup>
+  <Accordion title="Account Selection Strategy">
+    Choose load balancing strategy:
+    
+    - **Hybrid** (default) - Smart multi-signal selection
+    - **Sticky** - Cache-optimized, stays on same account
+    - **Round-Robin** - Load-balanced, rotates every request
+    
+    See [Load Balancing](/guides/load-balancing) guide for details.
+  </Accordion>
+  
+  <Accordion title="Quota Protection">
+    Set global minimum quota threshold (0-99%):
+    
+    - Applies to all accounts and models by default
+    - Overridden by per-account or per-model settings
+    - 0 = disabled (no automatic switching)
+  </Accordion>
+  
+  <Accordion title="Retry Configuration">
+    - **Max Retries**: Failed request retry attempts
+    - **Retry Delay**: Initial delay in milliseconds
+    - **Max Retry Delay**: Maximum backoff delay
+  </Accordion>
+  
+  <Accordion title="Request Timeout">
+    Maximum time to wait for API response (milliseconds)
+  </Accordion>
+</AccordionGroup>
+
+### Claude CLI Configuration
+
+Edit `~/.claude/settings.json` directly from the browser:
+
+<Steps>
+  <Step title="Connection Mode Toggle">
+    Switch between:
+    
+    - **Proxy Mode**: Routes through local proxy (Antigravity)
+    - **Paid Mode**: Uses official Anthropic API (requires credits)
+  </Step>
+  
+  <Step title="Select Models">
+    Configure model mappings:
+    
+    - Primary model
+    - Default Opus model
+    - Default Sonnet model
+    - Default Haiku model
+    - Sub-agent model (for faster operations)
+  </Step>
+  
+  <Step title="Apply Settings">
+    Click **Apply to Claude CLI** to save changes to `settings.json`
+  </Step>
+</Steps>
+
+<Warning>
+If you've set environment variables in your shell profile (`.zshrc`, `.bashrc`), they take precedence over `settings.json`. Clear them first:
+```bash
+unset ANTHROPIC_BASE_URL
+unset ANTHROPIC_AUTH_TOKEN
+```
+</Warning>
+
+## Logs Tab
+
+Real-time log streaming with filtering:
+
+### Features
+
+- **Live Streaming**: Server-Sent Events (SSE) for real-time logs
+- **Level Filtering**: Show/hide by severity (Debug/Info/Success/Warning/Error)
+- **Search**: Filter logs by content (case-insensitive)
+- **Auto-scroll**: Follows latest logs (disable to scroll history)
+- **Export**: Download logs as JSON (when Developer Mode enabled)
+- **Clear**: Wipe log history
+
+### Log Levels
+
+<Tabs>
+  <Tab title="Debug" icon="bug">
+    Detailed diagnostic information (magenta)
+    
+    Only shown when Developer Mode is enabled.
+  </Tab>
+  
+  <Tab title="Info" icon="circle-info">
+    General informational messages (blue)
+    
+    - Account selection
+    - Request routing
+    - Server status
+  </Tab>
+  
+  <Tab title="Success" icon="circle-check">
+    Successful operations (green)
+    
+    - Request completions
+    - Account authentication
+    - Configuration updates
+  </Tab>
+  
+  <Tab title="Warning" icon="triangle-exclamation">
+    Non-critical issues (yellow)
+    
+    - Rate limit approaching
+    - Quota low
+    - Fallback activation
+  </Tab>
+  
+  <Tab title="Error" icon="circle-xmark">
+    Critical errors (red)
+    
+    - Request failures
+    - Authentication errors
+    - API errors
+  </Tab>
+</Tabs>
+
+## Developer Mode
+
+Enable advanced features for debugging and testing:
+
+**Settings → Developer Mode → Enable**
+
+### Sub-Toggles
+
+When Developer Mode is enabled, additional toggles appear:
+
+<AccordionGroup>
+  <Accordion title="Screenshot Mode">
+    Redacts email addresses across all views for sharing screenshots:
+    
+    - Replaces emails with `user***@example.com`
+    - Applied to accounts, models, logs, and charts
+    - Client-side only (no backend changes)
+  </Accordion>
+  
+  <Accordion title="Debug Logging">
+    Shows verbose debug messages in logs viewer:
+    
+    - Backend diagnostic info
+    - Strategy selection details
+    - Token bucket state changes
+    - Health score updates
+  </Accordion>
+  
+  <Accordion title="Log Export">
+    Shows export button in logs toolbar:
+    
+    - Download logs as JSON
+    - Includes timestamps and levels
+    - Useful for bug reports
+  </Accordion>
+  
+  <Accordion title="Health Inspector">
+    Shows strategy health panel in Accounts tab (hybrid strategy only):
+    
+    - Per-account health scores (0-100)
+    - Token bucket state (tokens/max)
+    - Failure and success counts
+    - LRU timestamps
+    - Real-time score calculations
+  </Accordion>
+  
+  <Accordion title="Placeholder Data">
+    Injects 4 dummy accounts for UI testing:
+    
+    - Varied subscription tiers (Ultra/Pro/Free)
+    - Different quota levels
+    - Rate limit scenarios
+    - **Include Real Accounts**: Merge with actual accounts
+    - Client-side only (no backend changes)
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+Developer Mode exposes internal metrics via `/api/strategy/health` endpoint. Only enable when actively debugging.
+</Warning>
+
+## Multi-Language Support
+
+The console supports 5 languages:
+
+- 🇺🇸 English
+- 🇨🇳 Chinese (中文)
+- 🇮🇩 Indonesian (Bahasa)
+- 🇧🇷 Portuguese (PT-BR)
+- 🇹🇷 Turkish (Türkçe)
+
+Change language in **Settings → Language** dropdown.
+
+## Security Features
+
+### Password Protection
+
+Optional password to restrict web console access:
+
+```bash
+WEBUI_PASSWORD=your-secure-password acc start
+```
+
+All requests to `/api/*` and web UI require authentication.
+
+### Configuration Redaction
+
+Sensitive values are automatically redacted in API responses:
+
+- Refresh tokens
+- OAuth codes
+- API keys
+- Passwords
+
+Redacted as: `[REDACTED]`
+
+### Session Management
+
+- Passwords stored as bcrypt hashes
+- Session tokens in HTTP-only cookies
+- 24-hour session expiration
+- Logout clears all session data
+
+## Performance Optimization
+
+### Smart Polling
+
+The console uses adaptive refresh rates:
+
+- **Active tab**: 30 seconds ±20% jitter
+- **Background tab**: 90 seconds (3x slower)
+- **Visibility detection**: Pauses when browser minimized
+
+### Skeleton Loading
+
+All views show skeleton screens during data fetch:
+
+- Improves perceived performance
+- Matches final layout structure
+- Smooth transition to real data
+
+### Lazy Loading
+
+Views load on-demand:
+
+- Dashboard, Accounts, Models, Settings, Logs
+- HTML partials fetched when tab clicked
+- Cached after first load
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Console not loading">
+    Check proxy server is running:
+    ```bash
+    acc status
+    ```
+    
+    If stopped:
+    ```bash
+    acc start
+    ```
+    
+    Verify URL matches configured port:
+    ```bash
+    curl http://localhost:8080/health
+    ```
+  </Accordion>
+  
+  <Accordion title="Data not refreshing">
+    Check browser console for errors:
+    
+    1. Open DevTools (F12)
+    2. Check Console tab for JS errors
+    3. Check Network tab for failed requests
+    
+    Common issues:
+    - Tab in background (3x slower refresh)
+    - Browser extension blocking requests
+    - CORS issues (shouldn't happen on localhost)
+  </Accordion>
+  
+  <Accordion title="OAuth popup blocked">
+    Allow popups for localhost:
+    
+    1. Check browser address bar for popup icon
+    2. Click "Always allow popups from localhost"
+    3. Try adding account again
+    
+    Alternative: Use Manual Authorization mode for headless servers
+  </Accordion>
+  
+  <Accordion title="Can't save Claude CLI settings">
+    Check file permissions:
+    ```bash
+    ls -la ~/.claude/settings.json
+    ```
+    
+    Ensure proxy has write access. If running as systemd service, set:
+    ```bash
+    export CLAUDE_CONFIG_PATH=/home/youruser/.claude
+    ```
+  </Accordion>
+  
+  <Accordion title="Charts not displaying">
+    Ensure Chart.js is loaded:
+    
+    1. Check browser console for errors
+    2. Verify network connectivity (Chart.js from CDN)
+    3. Try hard refresh (Ctrl+Shift+R)
+    
+    If behind firewall, Chart.js may be blocked.
+  </Accordion>
+</AccordionGroup>
+
+## Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| **Escape** | Clear search input |
+| **Tab** | Navigate between form fields |
+| **Enter** | Submit forms |
+| **Space** | Toggle checkboxes and switches |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Account Management" icon="users" href="/guides/account-management">
+    Add and configure Google accounts
+  </Card>
+  <Card title="Load Balancing" icon="scale-balanced" href="/guides/load-balancing">
+    Optimize multi-account distribution strategies
+  </Card>
+  <Card title="Claude Code Setup" icon="terminal" href="/guides/claude-code-setup">
+    Configure Claude CLI to use the proxy
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/overview">
+    Programmatic access to proxy endpoints
+  </Card>
+</CardGroup>

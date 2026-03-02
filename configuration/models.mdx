@@ -1,0 +1,215 @@
+---
+title: "Available Models"
+description: "Claude and Gemini models supported by Antigravity Claude Proxy"
+icon: "robot"
+---
+
+Antigravity Claude Proxy provides access to both Claude and Gemini models through a unified Anthropic-compatible API.
+
+## Claude Models
+
+Claude models are accessed through the proxy using Anthropic's API format. All Claude models support extended thinking capabilities.
+
+<CardGroup cols={1}>
+  <Card title="claude-opus-4-6-thinking" icon="brain">
+    **Most Capable Model**
+    
+    Claude Opus 4.6 with extended thinking capabilities. Best for complex reasoning tasks and challenging problems.
+    
+    - Extended thinking output
+    - Highest capability tier
+    - Best for multi-step reasoning
+  </Card>
+  
+  <Card title="claude-sonnet-4-5-thinking" icon="lightbulb">
+    **Balanced Performance**
+    
+    Claude Sonnet 4.5 with extended thinking. Excellent balance of speed and capability.
+    
+    - Extended thinking output
+    - Fast response times
+    - Ideal for general coding tasks
+  </Card>
+  
+  <Card title="claude-sonnet-4-5" icon="bolt">
+    **Standard Model**
+    
+    Claude Sonnet 4.5 without thinking output. Fastest response times for straightforward tasks.
+    
+    - No thinking blocks
+    - Maximum speed
+    - Best for simple operations
+  </Card>
+</CardGroup>
+
+### Claude Thinking Models
+
+Claude thinking models include an internal reasoning process before generating their final response:
+
+- **signature field**: Claude uses the `signature` field on thinking blocks for multi-turn conversations
+- **Thinking blocks**: Extended reasoning is included in the response as separate content blocks
+- **Cache support**: Thinking signatures are cached for conversation continuity
+
+## Gemini Models
+
+Gemini models provide high-performance alternatives with Google's latest AI technology. All Gemini models version 3+ include thinking capabilities.
+
+<CardGroup cols={1}>
+  <Card title="gemini-3.1-pro-high" icon="star">
+    **High Performance Tier**
+    
+    Gemini 3.1 Pro High with advanced thinking. Best for demanding workloads.
+    
+    - Extended thinking via `thoughtSignature`
+    - High quota allocation
+    - Best for production use
+  </Card>
+  
+  <Card title="gemini-3.1-pro-low" icon="gauge">
+    **Balanced Tier**
+    
+    Gemini 3.1 Pro Low with thinking support. Good balance of performance and quota.
+    
+    - Extended thinking support
+    - Moderate quota allocation
+    - General purpose use
+  </Card>
+  
+  <Card title="gemini-3-flash" icon="zap">
+    **Fast Responses**
+    
+    Gemini 3 Flash with thinking. Optimized for speed and efficiency.
+    
+    - Quick response times
+    - Extended thinking included
+    - Ideal for rapid iteration
+  </Card>
+</CardGroup>
+
+### Gemini Thinking Models
+
+Gemini models (version 3 and higher) support thinking capabilities:
+
+- **thoughtSignature field**: Gemini uses the `thoughtSignature` field on `functionCall` parts
+- **Automatic detection**: Models with "thinking" in the name or version 3+ are treated as thinking models
+- **Signature caching**: `thoughtSignature` values are cached for 2 hours
+- **Fallback handling**: If Claude Code strips the signature, the proxy restores it from cache or uses a sentinel value
+
+## Model Selection in Claude Code
+
+Configure your Claude Code CLI to use specific models:
+
+<Tabs>
+  <Tab title="Configuration File">
+    Edit `~/.claude/settings.json`:
+    
+    ```json
+    {
+      "ANTHROPIC_BASE_URL": "http://localhost:8080",
+      "ANTHROPIC_AUTH_TOKEN": "test",
+      "ANTHROPIC_MODEL": "claude-opus-4-6-thinking",
+      "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-6-thinking",
+      "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-sonnet-4-5-thinking",
+      "ANTHROPIC_DEFAULT_HAIKU_MODEL": "claude-sonnet-4-5"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Environment Variables">
+    Set environment variables before launching Claude Code:
+    
+    ```bash
+    export ANTHROPIC_BASE_URL="http://localhost:8080"
+    export ANTHROPIC_AUTH_TOKEN="test"
+    export ANTHROPIC_MODEL="gemini-3.1-pro-high"
+    claude
+    ```
+  </Tab>
+  
+  <Tab title="WebUI Presets">
+    Use the Web Console to generate pre-configured settings:
+    
+    1. Open the WebUI at `http://localhost:8080`
+    2. Navigate to **Settings → Claude CLI**
+    3. Select a preset (Claude Thinking or Gemini 1M)
+    4. Click **Save to ~/.claude/settings.json**
+  </Tab>
+</Tabs>
+
+## Model Naming Conventions
+
+The proxy uses consistent naming patterns for model identification:
+
+### Thinking vs Non-Thinking
+
+| Pattern | Type | Example |
+|---------|------|--------|
+| Contains `thinking` | Thinking model | `claude-sonnet-4-5-thinking` |
+| Version 3+ (Gemini) | Thinking model | `gemini-3-flash` |
+| No `thinking` + version 2.x or older | Standard model | `claude-sonnet-4-5` |
+
+### Model Family Detection
+
+The proxy automatically detects model families:
+
+- **Claude family**: Model name contains `claude`
+- **Gemini family**: Model name contains `gemini`
+
+```javascript
+// Example model family detection
+getModelFamily('claude-opus-4-6-thinking')  // Returns 'claude'
+getModelFamily('gemini-3-flash')            // Returns 'gemini'
+```
+
+## Context Window Limits
+
+<Note>
+Gemini models have a maximum output token limit of **16,384 tokens**. The proxy automatically enforces this limit.
+</Note>
+
+### Quota and Rate Limits
+
+Each model has different quota allocations based on your subscription tier:
+
+- **Ultra tier**: Highest quota limits across all models
+- **Pro tier**: Moderate quota limits
+- **Free tier**: Basic quota limits
+
+Check your current quota in the Web Console under **Models** or via the `/account-limits` API endpoint.
+
+## Cross-Model Conversations
+
+<Warning>
+When switching between Claude and Gemini models mid-conversation, thinking signatures may be incompatible and will be dropped automatically.
+</Warning>
+
+The proxy handles cross-model scenarios:
+
+1. **Signature validation**: Checks if cached signatures match the target model family
+2. **Automatic cleanup**: Drops incompatible signatures when switching families
+3. **Recovery mechanism**: Injects synthetic messages to close interrupted tool loops
+
+### Best Practices
+
+- **Stick to one family**: Use either Claude or Gemini for the entire conversation
+- **Use fallback strategically**: Enable fallback only when needed to maintain signature compatibility
+- **Monitor model switches**: Check logs for signature cleanup warnings
+
+## Testing Models
+
+The proxy includes test utilities for each model family:
+
+```bash
+# Test Claude models
+npm run test:signatures
+
+# Test Gemini models
+npm run test:crossmodel
+
+# Test all models
+npm test
+```
+
+Default test models:
+- **Claude**: `claude-sonnet-4-5-thinking`
+- **Gemini**: `gemini-3-flash`

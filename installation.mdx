@@ -1,0 +1,244 @@
+---
+title: Installation
+description: Multiple installation methods for Antigravity Claude Proxy including npm, npx, and git clone.
+---
+
+## Prerequisites
+
+Before installing, ensure you have the following:
+
+- **Node.js** 18.0.0 or later ([download here](https://nodejs.org/))
+- **npm** (comes with Node.js) or your preferred package manager
+- **Antigravity** app (optional, for single-account mode) OR Google account(s) for multi-account mode
+
+<Tip>
+Check your Node.js version with `node --version`. If you need to upgrade, use [nvm](https://github.com/nvm-sh/nvm) (macOS/Linux) or download from [nodejs.org](https://nodejs.org/) (Windows).
+</Tip>
+
+## Installation methods
+
+### Option 1: npm global install (recommended)
+
+Install the package globally to use the `acc` command from anywhere:
+
+```bash
+npm install -g antigravity-claude-proxy@latest
+```
+
+Verify the installation:
+
+```bash
+acc --version
+```
+
+This method provides:
+- The `acc` command available system-wide
+- Easy updates with `npm update -g antigravity-claude-proxy`
+- Automatic dependency management
+
+### Option 2: npx (no install required)
+
+Run the proxy without installing it globally:
+
+```bash
+npx antigravity-claude-proxy@latest start
+```
+
+This method:
+- Downloads and runs the latest version automatically
+- Useful for trying the proxy before installing
+- No global installation required
+- Always uses the latest version
+
+<Note>
+With npx, you'll need to use the full command `npx antigravity-claude-proxy@latest` instead of the `acc` shorthand.
+</Note>
+
+### Option 3: git clone (for development)
+
+Clone the repository for local development or to contribute:
+
+```bash
+git clone https://github.com/badri-s2001/antigravity-claude-proxy.git
+cd antigravity-claude-proxy
+npm install
+```
+
+Verify the installation:
+
+```bash
+node src/index.js --version
+```
+
+This method provides:
+- Access to the latest development code
+- Ability to make local modifications
+- Direct access to source files and tests
+
+<Tip>
+The `npm install` command automatically builds the required CSS via the prepare hook, so you don't need to run a separate build command.
+</Tip>
+
+## Platform-specific notes
+
+### macOS
+
+No additional setup required. The proxy works out of the box after installation.
+
+If you encounter permission issues with global npm installs, consider using [nvm](https://github.com/nvm-sh/nvm) to manage Node.js versions without requiring sudo:
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+nvm install 18
+nvm use 18
+```
+
+### Linux
+
+For global npm installs, you may need to configure npm to avoid using sudo:
+
+```bash
+mkdir -p ~/.npm-global
+npm config set prefix '~/.npm-global'
+echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
+source ~/.bashrc
+```
+
+### Windows
+
+Run the installation command in an elevated PowerShell or Command Prompt (as Administrator) if you encounter permission issues.
+
+<Warning>
+On Windows, make sure to restart your terminal after installation to ensure the `acc` command is available in your PATH.
+</Warning>
+
+## Verification steps
+
+After installation, verify that everything is working correctly:
+
+<Steps>
+  <Step title="Check version">
+    Confirm the proxy is installed:
+
+    <CodeGroup>
+      ```bash npm global
+      acc --version
+      ```
+
+      ```bash npx
+      npx antigravity-claude-proxy@latest --version
+      ```
+
+      ```bash git clone
+      node src/index.js --version
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="View help">
+    Display available commands:
+
+    <CodeGroup>
+      ```bash npm global
+      acc --help
+      ```
+
+      ```bash npx
+      npx antigravity-claude-proxy@latest --help
+      ```
+
+      ```bash git clone
+      node src/index.js --help
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Start the server">
+    Launch the proxy to test it's working:
+
+    <CodeGroup>
+      ```bash npm global
+      acc start
+      ```
+
+      ```bash npx
+      npx antigravity-claude-proxy@latest start
+      ```
+
+      ```bash git clone
+      npm start
+      ```
+    </CodeGroup>
+
+    You should see output indicating the proxy has launched successfully.
+  </Step>
+
+  <Step title="Check server health">
+    In a new terminal, verify the server is responding:
+
+    ```bash
+    curl http://localhost:8080/health
+    ```
+
+    Expected response:
+    ```json
+    {"status":"ok","version":"2.7.7"}
+    ```
+  </Step>
+</Steps>
+
+## Updating
+
+### npm global install
+
+Update to the latest version:
+
+```bash
+npm update -g antigravity-claude-proxy
+```
+
+### npx
+
+No update needed - npx always uses the latest version when you specify `@latest`.
+
+### git clone
+
+Pull the latest changes and reinstall dependencies:
+
+```bash
+cd antigravity-claude-proxy
+git pull origin main
+npm install
+```
+
+## Uninstalling
+
+### npm global install
+
+```bash
+npm uninstall -g antigravity-claude-proxy
+```
+
+### git clone
+
+Simply delete the cloned directory:
+
+```bash
+rm -rf antigravity-claude-proxy
+```
+
+<Note>
+Uninstalling the proxy does not remove your account configuration. Account data is stored in `~/.config/antigravity-proxy/accounts.json` and persists after uninstallation.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Follow the quickstart guide to configure and start using the proxy.
+  </Card>
+  
+  <Card title="Account management" icon="users" href="/guides/account-management">
+    Learn how to add and manage Google accounts for the proxy.
+  </Card>
+</CardGroup>

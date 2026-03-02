@@ -1,0 +1,350 @@
+---
+title: Account Management
+description: Add and manage Google accounts for the Antigravity Claude Proxy
+icon: users
+---
+
+The proxy supports multiple Google accounts for load balancing and failover. You can add accounts through the web dashboard, CLI, or automatic detection.
+
+## Adding Accounts
+
+There are three methods to add Google accounts to the proxy:
+
+<CardGroup cols={3}>
+  <Card title="Web Dashboard" icon="browser" href="#web-dashboard">
+    Visual interface with OAuth popup (Recommended)
+  </Card>
+  <Card title="CLI" icon="terminal" href="#cli-method">
+    Terminal-based account management
+  </Card>
+  <Card title="Automatic" icon="wand-magic-sparkles" href="#automatic-detection">
+    Auto-detect from Antigravity app
+  </Card>
+</CardGroup>
+
+### Web Dashboard
+
+The easiest way to add accounts is through the web interface:
+
+<Steps>
+  <Step title="Start the proxy server">
+    ```bash
+    acc start
+    # or: antigravity-claude-proxy start
+    ```
+  </Step>
+  
+  <Step title="Open the web console">
+    Navigate to `http://localhost:8080` in your browser, or run:
+    ```bash
+    acc ui
+    ```
+  </Step>
+  
+  <Step title="Add account via OAuth">
+    1. Click the **Accounts** tab
+    2. Click **Add Account**
+    3. Complete Google OAuth authorization in the popup window
+    4. Your account will appear in the accounts list with subscription tier and quota information
+  </Step>
+</Steps>
+
+<Tip>
+**Headless/Remote Servers**: The WebUI supports "Manual Authorization" mode. After clicking "Add Account", copy the OAuth URL, complete authorization on your local machine, and paste the authorization code back into the form.
+</Tip>
+
+### CLI Method
+
+For terminal users or headless servers:
+
+<Tabs>
+  <Tab title="Desktop">
+    Opens browser automatically for OAuth flow:
+    ```bash
+    antigravity-claude-proxy accounts add
+    ```
+  </Tab>
+  
+  <Tab title="Headless">
+    For Docker/SSH environments without a browser:
+    ```bash
+    antigravity-claude-proxy accounts add --no-browser
+    ```
+    
+    This will:
+    1. Display an OAuth URL
+    2. You copy and open it on another device
+    3. After authorization, paste the callback URL or code
+  </Tab>
+</Tabs>
+
+### Automatic Detection
+
+If you have the **Antigravity** desktop app installed and logged in, the proxy automatically detects your local session. No additional setup required.
+
+<Note>
+The proxy will use the OAuth token from Antigravity's local database at `~/.config/Antigravity/Local Storage/leveldb`.
+</Note>
+
+## Managing Accounts
+
+### CLI Commands
+
+The proxy provides a full suite of account management commands:
+
+<CodeGroup>
+```bash List Accounts
+antigravity-claude-proxy accounts list
+```
+
+```bash Verify Tokens
+# Test that all refresh tokens are valid
+antigravity-claude-proxy accounts verify
+```
+
+```bash Remove Account
+# Interactive removal
+antigravity-claude-proxy accounts remove
+```
+
+```bash Clear All
+# Remove all accounts
+antigravity-claude-proxy accounts clear
+```
+</CodeGroup>
+
+### Interactive Menu
+
+Run the accounts command without arguments for an interactive menu:
+
+```bash
+antigravity-claude-proxy accounts
+```
+
+Options:
+- **(a)dd new** - Add another account
+- **(r)emove existing** - Remove specific accounts
+- **(f)resh start** - Clear all and start over
+- **(e)xit** - Cancel and exit
+
+## Account Configuration File
+
+Accounts are stored in:
+```
+~/.config/antigravity-proxy/accounts.json
+```
+
+<Warning>
+**Important**: Stop the proxy server before manually editing this file:
+```bash
+acc stop
+```
+
+Changes won't take effect until you restart the server.
+</Warning>
+
+### Account Data Structure
+
+Each account contains:
+
+```json
+{
+  "email": "user@gmail.com",
+  "source": "oauth",
+  "refreshToken": "encrypted_token",
+  "projectId": "auto-detected-project",
+  "enabled": true,
+  "addedAt": "2026-03-02T10:30:00.000Z",
+  "lastUsed": 1709377800000,
+  "subscription": {
+    "tier": "pro",
+    "projectId": "project-123",
+    "detectedAt": "2026-03-02T10:30:00.000Z"
+  },
+  "quota": {
+    "models": {
+      "claude-sonnet-4-5-thinking": {
+        "remainingFraction": 0.85,
+        "resetTime": 1709467800000
+      }
+    },
+    "lastChecked": 1709377800000
+  },
+  "quotaThreshold": 0.10,
+  "modelQuotaThresholds": {
+    "claude-opus-4-6-thinking": 0.20
+  },
+  "modelRateLimits": {}
+}
+```
+
+<AccordionGroup>
+  <Accordion title="Field Descriptions">
+    - **email**: Account identifier
+    - **source**: `oauth`, `manual`, or `database`
+    - **refreshToken**: OAuth refresh token (auto-renewed)
+    - **projectId**: Google Cloud project (auto-detected)
+    - **enabled**: Enable/disable account without removing
+    - **subscription.tier**: `free`, `pro`, or `ultra`
+    - **quota.models**: Per-model quota cache (0-1 fraction)
+    - **quotaThreshold**: Account-level minimum quota before switching (0-0.99)
+    - **modelQuotaThresholds**: Per-model threshold overrides
+    - **modelRateLimits**: Temporary rate limit state (runtime only)
+  </Accordion>
+  
+  <Accordion title="Subscription Tiers">
+    Automatically detected from the Cloud Code API:
+    
+    | Tier | Badge Color | Features |
+    |------|-------------|----------|
+    | **Ultra** | Purple | Highest quota limits, priority access |
+    | **Pro** | Blue | Standard quota limits |
+    | **Free** | Gray | Basic quota limits |
+    
+    Tier detection happens on first API request or when checking account limits.
+  </Accordion>
+</AccordionGroup>
+
+## Account Status
+
+### Web Console
+
+The Accounts tab shows:
+- **Subscription tier badge** (Ultra/Pro/Free)
+- **Quota progress bars** per model
+- **Rate limit status** (with reset countdown)
+- **Enable/disable toggle**
+- **Last used timestamp**
+- **Health inspector** (when Developer Mode enabled)
+
+### Check Limits via API
+
+```bash
+# JSON format
+curl http://localhost:8080/account-limits
+
+# Table format (human-readable)
+curl "http://localhost:8080/account-limits?format=table"
+
+# Include 30-day usage history
+curl "http://localhost:8080/account-limits?includeHistory=true"
+```
+
+## Quota Protection
+
+Set minimum quota thresholds to switch accounts before quota runs out:
+
+<Tabs>
+  <Tab title="Global Threshold">
+    Server-wide default for all accounts:
+    
+    **Web Console**: Settings → Quota Protection → Global Threshold
+    
+    **Config File**:
+    ```json
+    {
+      "globalQuotaThreshold": 0.10  // Switch at 10% remaining
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Per-Account Threshold">
+    Override global threshold for specific accounts:
+    
+    **Web Console**: Accounts tab → Account card → Settings icon → Quota Threshold
+    
+    **Config File**:
+    ```json
+    {
+      "email": "user@gmail.com",
+      "quotaThreshold": 0.20  // Switch at 20% for this account
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Per-Model Threshold">
+    Set different thresholds for specific models:
+    
+    **Web Console**: Models tab → Drag threshold markers on quota bars
+    
+    **Config File**:
+    ```json
+    {
+      "email": "user@gmail.com",
+      "modelQuotaThresholds": {
+        "claude-opus-4-6-thinking": 0.25,  // 25% for Opus
+        "gemini-3-flash": 0.05             // 5% for Gemini
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Info>
+**Priority Order**: Per-model threshold > Per-account threshold > Global threshold > Default (0)
+
+Thresholds are stored as fractions (0-0.99) and displayed as percentages (0-99%) in the UI.
+</Info>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Account shows as invalid">
+    The refresh token may have expired. Re-authenticate:
+    
+    1. In the web console, click **Fix Account** on the invalid account
+    2. Or remove and re-add via CLI:
+       ```bash
+       antigravity-claude-proxy accounts remove
+       antigravity-claude-proxy accounts add
+       ```
+  </Accordion>
+  
+  <Accordion title="OAuth callback fails on headless server">
+    Use the `--no-browser` flag for manual authorization:
+    ```bash
+    antigravity-claude-proxy accounts add --no-browser
+    ```
+    
+    Then copy the OAuth URL to a device with a browser.
+  </Accordion>
+  
+  <Accordion title="Server doesn't recognize new accounts">
+    Make sure you stopped the server before adding accounts:
+    ```bash
+    acc stop
+    antigravity-claude-proxy accounts add
+    acc start
+    ```
+  </Accordion>
+  
+  <Accordion title="Account stuck in rate-limited state">
+    Wait for the reset time to expire (shown in web console), or verify tokens:
+    ```bash
+    antigravity-claude-proxy accounts verify
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Security Notes
+
+<Warning>
+**OAuth Token Security**
+
+- Refresh tokens are stored in plaintext in `accounts.json`
+- Protect this file with appropriate permissions:
+  ```bash
+  chmod 600 ~/.config/antigravity-proxy/accounts.json
+  ```
+- Never commit `accounts.json` to version control
+- Tokens are automatically renewed when they expire
+</Warning>
+
+<Note>
+**Optional Web Console Password**
+
+Set a password to protect the web interface:
+```bash
+WEBUI_PASSWORD=your-secure-password acc start
+```
+</Note>
